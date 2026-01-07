@@ -64,16 +64,8 @@ except:
     st.error("⚠️ Falta API Key en .streamlit/secrets.toml")
     st.stop()
 
-# --- 4. FUNCIONES DE AUDIO (BLINDADAS) ---
+# --- 4. FUNCIONES DE AUDIO Y LIMPIEZA ---
 
-def limpiar_texto(texto):
-    """Elimina markdown (*, #, -) para que el TTS no falle"""
-    # Eliminar asteriscos, almohadillas y guiones bajos
-    limpio = texto.replace("*", "").replace("#", "").replace("_", "")
-    # Eliminar enlaces markdown
-    limpio = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', limpio)
-    return limpio
-# --- NUEVA FUNCIÓN DE LIMPIEZA ---
 def limpiar_para_audio(texto):
     """Elimina markdown (*, #, -) y limpia el texto para el TTS"""
     # 1. Quitar asteriscos, almohadillas, guiones bajos, tildes inversas
@@ -83,7 +75,7 @@ def limpiar_para_audio(texto):
     # 3. Quitar guiones de listas al inicio de línea
     texto_limpio = re.sub(r'^\s*-\s+', '', texto_limpio, flags=re.MULTILINE)
     return texto_limpio.strip()
-# --- FUNCIÓN DE AUDIO MODIFICADA (ACEPTA VELOCIDAD) ---
+
 async def generar_audio_edge(texto, voz, velocidad="-10%"):
     """Genera audio limpiando el texto y ajustando velocidad"""
     texto_limpio = limpiar_para_audio(texto)
@@ -102,6 +94,7 @@ async def generar_audio_edge(texto, voz, velocidad="-10%"):
 CHARACTERS = {
     "leonor": {
         "name": "Leonor Polo",
+        "short_name": "Leonor", # Nombre para el botón
         "role": "La Protagonista",
         "avatar": "img/leonor.png", 
         "voice": "es-ES-ElviraNeural", 
@@ -124,6 +117,7 @@ CHARACTERS = {
     },
     "maximiliano": {
         "name": "Maximiliano Alcázar",
+        "short_name": "Maximiliano",
         "role": "El Dueño",
         "avatar": "img/maximiliano.png", 
         "voice": "es-ES-AlvaroNeural", 
@@ -145,10 +139,11 @@ CHARACTERS = {
     },
     "mercedes": {
         "name": "Doña Mercedes",
+        "short_name": "Doña Mercedes", # CORREGIDO: Nombre completo para el botón
         "role": "Ama de Llaves",
         "avatar": "img/mercedes.png", 
         "voice": "es-ES-AbrilNeural", 
-        "speed": "+0%",
+        "speed": "+0%", # AÑADIDA COMA AQUÍ
         "greeting": "Límpiese los pies. El Señor no está para nadie.",
         "system_instruction": """
             Eres Doña Mercedes (la Señora Martínez), ama de llaves de la finca 'Villa Aurora'.
@@ -160,11 +155,11 @@ CHARACTERS = {
             Usa puntos suspensivos (...) para las pausas.
             **Tono:** Servicial, entrañable pero firme y evasiva si te hacen preguntas indiscretas.
             **Objetivo:** Haz que el usuario se sienta bienvenido en la hacienda, pero niégale rotundamente que ocurra nada extraño en el piso de arriba.
-        """
-        
+        """ # CORREGIDO: Eliminadas las comillas extra que causaban el error
     },
     "elena": {
         "name": "Elena",
+        "short_name": "Elena",
         "role": "Espíritu",
         "avatar": "img/elena.png", 
         "voice": "es-ES-XimenaNeural", 
@@ -175,7 +170,7 @@ CHARACTERS = {
             Falleciste de cólera en el hospicio de San Bernardino cuando eráis niñas, pero sigues viva en la memoria de Leonor.
             Representas la inocencia, los sueños compartidos de ser maestras y viajar.
             Conoces los anhelos más profundos de Leonor porque fuiste su única familia.
-             NO uses asteriscos (*), guiones ni formato Markdown. 
+            NO uses asteriscos (*), guiones ni formato Markdown. 
             Usa puntos suspensivos (...) para las pausas.
             Habla muy lento y onírico.
             **Tono:** Dulce, etéreo, reconfortante y lleno de luz.
@@ -218,7 +213,8 @@ elif st.session_state.page == "seleccion":
             with col:
                 try: st.image(d["avatar"], use_container_width=True)
                 except: pass
-                if st.button(f"{d['name'].split()[0]}", key=k): ir_a_chat(k)
+                # Usamos short_name para que Doña Mercedes salga completo
+                if st.button(d["short_name"], key=k): ir_a_chat(k)
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("⬅️ Volver"): volver()
 
@@ -261,17 +257,15 @@ elif st.session_state.page == "chat":
                 box.markdown(full_text)
                 st.session_state.messages.append({"role": "model", "content": full_text})
                 
-                # --- AUDIO ROBUSTO ---
-                # Limpiamos el texto antes de enviarlo
+                # --- AUDIO GENERACIÓN ---
                 with st.spinner("🔊 ..."):
                     try:
-                        audio_file = asyncio.run(generar_audio_edge(full_text, data["voice"]))
+                        # Aseguramos pasar la velocidad definida en el personaje
+                        velocidad = data.get("speed", "-10%")
+                        audio_file = asyncio.run(generar_audio_edge(full_text, data["voice"], velocidad))
                         if audio_file:
                             st.audio(audio_file, format='audio/mp3', autoplay=True)
-                        else:
-                            st.warning("(Audio no disponible para este mensaje)")
                     except Exception as e:
-                        # Si falla el audio, no rompemos el chat, solo avisamos
                         print(f"Error audio: {e}")
 
             except Exception as e:
