@@ -1,163 +1,257 @@
 import streamlit as st
 import google.generativeai as genai
+import edge_tts
+import asyncio
+import tempfile
 import time
 
-# --- 1. CONFIGURACIÓN DE PÁGINA ---
+# --- 1. CONFIGURACIÓN DE PÁGINA Y ESTILOS ---
 st.set_page_config(
-    page_title="El Sueño de Leonor - Prototipo",
+    page_title="El Sueño de Leonor - Experiencia Interactiva",
     page_icon="🌹",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
-# Estilo visual
+# ESTILOS CSS (Look & Feel)
 st.markdown("""
 <style>
-    .stChatMessage { font-family: 'Georgia', serif; }
-    h1, h2, h3 { color: #4b3621; }
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lora:ital@0;1&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Lora', serif;
+        background-color: #fdfbf7;
+        color: #4b3621 !important;
+    }
+    
+    h1 {
+        font-family: 'Cinzel', serif;
+        color: #5e3c38 !important;
+        text-align: center;
+        text-transform: uppercase;
+        text-shadow: 2px 2px 4px #d4c5b0;
+    }
+    
+    h3 { color: #8b5e3c !important; text-align: center; font-style: italic; }
+
+    .stButton button {
+        background-color: transparent; border: 2px solid #8b5e3c; color: #5e3c38 !important;
+        border-radius: 10px; transition: 0.3s; font-weight: bold;
+    }
+    .stButton button:hover {
+        background-color: #5e3c38; color: white !important; transform: scale(1.05);
+    }
+    
+    .stChatMessage { background-color: #ffffff; border: 1px solid #e0d0c0; border-radius: 15px; }
+    .stChatMessage p { color: #2c1e1a !important; }
+    
+    #MainMenu, footer, header {visibility: hidden;}
+    .stTextInput input { color: #2c1e1a !important; background-color: #ffffff !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. CONEXIÓN API (SECRETS) ---
+# --- 2. GESTIÓN DE ESTADO ---
+if "page" not in st.session_state: st.session_state.page = "portada"
+if "current_char" not in st.session_state: st.session_state.current_char = None
+if "messages" not in st.session_state: st.session_state.messages = []
+
+# --- 3. CONEXIÓN API (GEMINI) ---
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=api_key)
-except Exception:
-    st.error("⚠️ Falta la API Key. Crea el archivo .streamlit/secrets.toml")
+except:
+    st.error("⚠️ Falta API Key en .streamlit/secrets.toml")
     st.stop()
 
-# --- 3. PERSONAJES (CONTEXTO NOVELA) ---
+# --- 4. FUNCIÓN PARA GENERAR AUDIO (MASCULINO/FEMENINO) ---
+async def generar_audio_edge(texto, voz):
+    """Genera audio usando Microsoft Edge TTS (Gratis y Alta Calidad)"""
+    communicate = edge_tts.Communicate(texto, voz)
+    # Crear un archivo temporal para guardar el audio
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+        await communicate.save(fp.name)
+        return fp.name
+
+# --- 5. PERSONAJES CON VOCES ASIGNADAS ---
 CHARACTERS = {
     "leonor": {
         "name": "Leonor Polo",
         "role": "La Protagonista",
         "avatar": "img/leonor.png", 
+        "voice": "es-ES-ElviraNeural", # Voz Femenina (España)
         "greeting": "Bienvenido a Villa Aurora. Apenas he deshecho mi equipaje. ¿Traéis noticias de Madrid?",
         "system_instruction": """
-            Eres Leonor Polo, protagonista de 'El Sueño de Leonor' (S. XIX).
-            Eres culta, institutriz, resiliente tras tu paso por el hospicio.
-            Te gusta Maximiliano pero mantienes las distancias por decoro.
-            Habla con lenguaje culto y elegante de la época.
+            Eres Leonor Polo, la protagonista de la novela 'El Sueño de Leonor'. Eres la Jane Eyre española
+            Estás en la España del siglo XIX (año 1870 aprox).
+            Has sobrevivido a una infancia dura en Vallefrío y al hospicio de San Bernardino en Madrid.
+            Ahora eres institutriz en la hacienda 'Villa Aurora' en Sevilla, cuidando a la pequeña Emily.
+            Eres una ávida lectora (adoras a Fernán Caballero y Lord Byron)
+            Valoras tu independencia y tus principios morales por encima de todo.
+            Sientes una atracción innegable por el señor de la casa, Maximiliano Alcazar, pero te mantienes cauta por tu posición social y tu orgullo.
+            **Tono:** Educada, culta, melancólica pero esperanzada. Usas un vocabulario rico y cuidado propio del Romanticismo.
+            **Objetivo:** Habla de la importancia de la educación y la libertad, y expresa tus dudas sobre los misteriosos ruidos que escuchas en el ático por las noches
         """
     },
     "maximiliano": {
         "name": "Maximiliano Alcázar",
         "role": "El Dueño de la Finca",
         "avatar": "img/maximiliano.png", 
+        "voice": "es-ES-AlvaroNeural", # Voz Masculina (España)
         "greeting": "¿Quién sois? No recibo visitas sin cita previa. Sed breve.",
         "system_instruction": """
-            Eres Maximiliano Alcázar, rico y atormentado.
-            Ocultas un secreto en el ático y cargas con una gran culpa.
-            Eres brusco pero noble en el fondo. Niega cualquier rumor sobre ruidos extraños.
+            Eres Maximiliano Alcázar del Valle, dueño de la hacienda 'Villa Aurora' en Sevilla. Eres el rochester de la novela Jane eyre adaptado al romanticismo en españa.
+            Eres un hombre de mundo, rico y elegante, pero llevas una pesada carga en tu conciencia.
+            Has viajado por Filipinas y Cuba.
+            Te muestras a veces arrogante y brusco para ocultar tu dolor, pero en el fondo eres noble.
+            Estás enamorado de la institutriz, Leonor, pero sabes que un oscuro secreto (tu matrimonio pasado y la locura que escondes en el ático) te impide ser feliz con ella. Niegas los sonidos que se producen en el atico.
+            **Tono:** Grave, misterioso, galante pero con un trasfondo de amargura.
+            **Objetivo:** Seduce intelectualmente al usuario (como haces con Leonor), insinúa que has cometido errores graves en tu juventud y mantén el misterio sobre lo que ocurre en el piso superior de tu casa.
         """
     },
     "mercedes": {
         "name": "Doña Mercedes",
         "role": "Ama de Llaves",
         "avatar": "img/mercedes.png", 
+        "voice": "es-ES-AbrilNeural", # Voz Femenina Mayor (España)
         "greeting": "Límpiese los pies antes de entrar. El Señor no está para nadie.",
         "system_instruction": """
-            Eres el Ama de Llaves, Doña Mercedes.
-            Protectora, estricta y religiosa.
-            Tu misión es proteger la reputación de la casa. Desvía cualquier pregunta incómoda.
+            Eres Doña Mercedes (la Señora Martínez), ama de llaves de la finca 'Villa Aurora'.
+            Eres una mujer eficiente, maternal y muy protectora con los habitantes de la casa, especialmente con la niña Emily y la señorita Leonor.
+            Sin embargo, guardas celosamente los secretos del Señor Alcázar.
+            Eres profundamente religiosa y te preocupan las normas morales.
+            Cuando te preguntan por los ruidos extraños del ático, siempre buscas excusas: dices que son muebles viejos, el viento o gatos.
+            **Tono:** Servicial, entrañable pero firme y evasiva si te hacen preguntas indiscretas.
+            **Objetivo:** Haz que el usuario se sienta bienvenido en la hacienda, pero niégale rotundamente que ocurra nada extraño en el piso de arriba.
         """
     },
     "elena": {
         "name": "Elena",
         "role": "Recuerdo / Espíritu",
         "avatar": "img/elena.png", 
+        "voice": "es-MX-DaliaNeural", # Voz Femenina Suave (Latina/Neutra)
         "greeting": "La brisa trae recuerdos de cuando éramos niñas... ¿Los sientes?",
         "system_instruction": """
-            Eres el espíritu de Elena, amiga de la infancia de Leonor.
-            Dulce, etérea y onírica. Representas la esperanza y la inocencia.
+            Eres el espíritu o el recuerdo vivo de Elena, la mejor amiga de la infancia de Leonor.
+            Falleciste de cólera en el hospicio de San Bernardino cuando eráis niñas, pero sigues viva en la memoria de Leonor.
+            Representas la inocencia, los sueños compartidos de ser maestras y viajar.
+            Conoces los anhelos más profundos de Leonor porque fuiste su única familia.
+            **Tono:** Dulce, etéreo, reconfortante y lleno de luz.
+            **Objetivo:** Actúa como confidente. Anima al usuario (como si fuera Leonor) a perseguir sus sueños de libertad y amor, recordándole que es fuerte y valiente.
         """
     }
 }
 
-# --- 4. BARRA LATERAL ---
-with st.sidebar:
-    st.header("🎭 Personajes")
-    char_names = [d["name"] for k, d in CHARACTERS.items()]
-    selected = st.radio("Hablar con:", char_names)
+# --- 6. FUNCIONES DE NAVEGACIÓN ---
+def ir_a_seleccion():
+    st.session_state.page = "seleccion"
+    st.rerun()
+
+def ir_a_chat(personaje):
+    st.session_state.current_char = personaje
+    st.session_state.page = "chat"
+    st.session_state.messages = [{"role": "model", "content": CHARACTERS[personaje]["greeting"]}]
+    st.rerun()
+
+def volver_inicio():
+    st.session_state.page = "portada"
+    st.rerun()
+
+# --- 7. VISTA: PORTADA ---
+if st.session_state.page == "portada":
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.title("EL SUEÑO DE LEONOR")
+    st.markdown("<h3>Una experiencia interactiva en el Romanticismo Español</h3>", unsafe_allow_html=True)
     
-    # Identificar personaje
-    curr_key = next(k for k, v in CHARACTERS.items() if v["name"] == selected)
-    curr_char = CHARACTERS[curr_key]
-    
-    try:
-        st.image(curr_char["avatar"], width=150)
-    except:
-        st.warning("Falta imagen en carpeta img/")
-    
-    if st.button("Reiniciar"):
-        st.session_state.messages = []
-        st.rerun()
-
-# --- 5. LOGICA DEL CHAT ---
-st.title(f"💬 {curr_char['name']}")
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Mensaje de bienvenida al cambiar personaje
-if "last_char" not in st.session_state or st.session_state.last_char != curr_key:
-    st.session_state.last_char = curr_key
-    st.session_state.messages = [{"role": "model", "content": curr_char["greeting"]}]
-
-# --- 6. CONFIGURACIÓN DEL MODELO (AQUÍ ESTÁ EL CAMBIO) ---
-# Intentamos usar el modelo preview solicitado. Si falla, usamos el estable.
-TARGET_MODEL = "gemini-2.5-flash-preview-09-2025"
-FALLBACK_MODEL = "gemini-1.5-flash"
-
-try:
-    # Intentamos configurar el modelo solicitado
-    model = genai.GenerativeModel(
-        model_name=TARGET_MODEL,
-        system_instruction=curr_char["system_instruction"]
-    )
-    # Hacemos una llamada vacía de prueba para ver si el nombre es válido
-    # (Esto es un truco técnico para validar el modelo antes de chatear)
-    # Si falla, saltará al 'except'
-except Exception:
-    # Si el modelo 2.5 no existe o da error, usamos el 1.5 silenciosamente
-    model = genai.GenerativeModel(
-        model_name=FALLBACK_MODEL,
-        system_instruction=curr_char["system_instruction"]
-    )
-    # Opcional: Avisar al usuario en la barra lateral (descomentar si quieres verlo)
-    # st.sidebar.warning(f"Usando {FALLBACK_MODEL} (El 2.5 no respondió)")
-
-# --- 7. MOSTRAR CHAT ---
-for msg in st.session_state.messages:
-    role = "assistant" if msg["role"] == "model" else "user"
-    av = curr_char["avatar"] if role == "assistant" else None
-    with st.chat_message(role, avatar=av):
-        st.markdown(msg["content"])
-
-# --- 8. INPUT USUARIO ---
-if prompt := st.chat_input("Tu respuesta..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    # Preparar historial
-    history = [{"role": m["role"], "parts": [m["content"]]} for m in st.session_state.messages]
-
-    # Generar respuesta
-    with st.chat_message("assistant", avatar=curr_char["avatar"]):
-        box = st.empty()
-        full_text = ""
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
         try:
-            # Enviamos historial menos el último mensaje (que ya enviamos en send_message)
-            chat = model.start_chat(history=history[:-1])
-            response = chat.send_message(prompt, stream=True)
+            # CORREGIDO: use_container_width en lugar de use_column_width
+            st.image("img/villa_aurora.png", use_container_width=True, caption="Hacienda Villa Aurora, Sevilla (1870)")
+        except:
+            st.info("ℹ️ Falta imagen 'villa_aurora.png'")
+            # CORREGIDO: use_container_width en lugar de use_column_width
+            st.image("https://placehold.co/600x400/png?text=Villa+Aurora", use_container_width=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🗝️ LLAMAR A LA PUERTA", use_container_width=True):
+            ir_a_seleccion()
+
+# --- 8. VISTA: SELECCIÓN ---
+elif st.session_state.page == "seleccion":
+    st.title("EL VESTÍBULO")
+    st.markdown("<h3>¿Con quién desea hablar, noble viajero?</h3>", unsafe_allow_html=True)
+    st.markdown("---")
+    
+    cols = st.columns(4)
+    keys = list(CHARACTERS.keys())
+    for i, col in enumerate(cols):
+        if i < len(keys):
+            char_key = keys[i]
+            char_data = CHARACTERS[char_key]
+            with col:
+                try: 
+                    # CORREGIDO: use_container_width en lugar de use_column_width
+                    st.image(char_data["avatar"], use_container_width=True)
+                except: st.warning(f"Falta {char_key}")
+                
+                # El botón tiene un key único para evitar errores
+                if st.button(f"{char_data['name'].split()[0]}", key=char_key):
+                    ir_a_chat(char_key)
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("⬅️ Volver", use_container_width=True): volver_inicio()
+
+# --- 9. VISTA: CHAT CON VOZ NEURONAL ---
+elif st.session_state.page == "chat":
+    char_key = st.session_state.current_char
+    char_data = CHARACTERS[char_key]
+    
+    c1, c2 = st.columns([1, 10])
+    with c1:
+        if st.button("⬅️"): ir_a_seleccion()
+    with c2:
+        st.subheader(f"Conversando con {char_data['name']}")
+
+    # Historial
+    for msg in st.session_state.messages:
+        role = "assistant" if msg["role"] == "model" else "user"
+        av = char_data["avatar"] if role == "assistant" else None
+        with st.chat_message(role, avatar=av):
+            st.markdown(msg["content"])
+
+    # Modelo Gemini
+    try:
+        model = genai.GenerativeModel("gemini-2.5-flash-preview-09-2025", system_instruction=char_data["system_instruction"])
+    except:
+        model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=char_data["system_instruction"])
+
+    # Input Usuario
+    if prompt := st.chat_input("Escribe tu mensaje..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"): st.markdown(prompt)
+
+        # Generar Respuesta
+        with st.chat_message("assistant", avatar=char_data["avatar"]):
+            box = st.empty()
+            full_text = ""
+            history = [{"role": m["role"], "parts": [m["content"]]} for m in st.session_state.messages]
             
-            for chunk in response:
-                if chunk.text:
-                    full_text += chunk.text
-                    box.markdown(full_text + "▌")
-                    time.sleep(0.01)
-            box.markdown(full_text)
-            st.session_state.messages.append({"role": "model", "content": full_text})
-            
-        except Exception as e:
-            st.error(f"Error: {e}")
+            try:
+                chat = model.start_chat(history=history[:-1])
+                response = chat.send_message(prompt, stream=True)
+                
+                for chunk in response:
+                    if chunk.text:
+                        full_text += chunk.text
+                        box.markdown(full_text + "▌")
+                        time.sleep(0.01)
+                box.markdown(full_text)
+                st.session_state.messages.append({"role": "model", "content": full_text})
+                
+                # --- GENERAR AUDIO ESPECÍFICO (HOMBRE/MUJER) ---
+                with st.spinner(f"🔊 {char_data['name']} está hablando..."):
+                    # Llamamos a la función asíncrona de EdgeTTS
+                    audio_file = asyncio.run(generar_audio_edge(full_text, char_data["voice"]))
+                    st.audio(audio_file, format='audio/mp3', autoplay=True)
+
+            except Exception as e:
+                st.error(f"Error: {e}")
