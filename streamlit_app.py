@@ -148,7 +148,7 @@ CHARACTERS = {
         "role": "Ama de Llaves",
         "avatar": "img/mercedes.png", 
         "voice": "es-ES-AbrilNeural", 
-        "speed": "+0%"
+        "speed": "+0%",
         "greeting": "Límpiese los pies. El Señor no está para nadie.",
         "system_instruction": """
             Eres Doña Mercedes (la Señora Martínez), ama de llaves de la finca 'Villa Aurora'.
@@ -161,7 +161,7 @@ CHARACTERS = {
             **Tono:** Servicial, entrañable pero firme y evasiva si te hacen preguntas indiscretas.
             **Objetivo:** Haz que el usuario se sienta bienvenido en la hacienda, pero niégale rotundamente que ocurra nada extraño en el piso de arriba.
         """
-        """
+        
     },
     "elena": {
         "name": "Elena",
