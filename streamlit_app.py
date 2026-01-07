@@ -4,6 +4,7 @@ import edge_tts
 import asyncio
 import tempfile
 import time
+import re # Importamos expresiones regulares para limpiar el texto
 
 # --- 1. CONFIGURACIÓN DE PÁGINA Y ESTILOS ---
 st.set_page_config(
@@ -13,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ESTILOS CSS (Look & Feel)
+# ESTILOS CSS
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lora:ital@0;1&display=swap');
@@ -63,174 +64,144 @@ except:
     st.error("⚠️ Falta API Key en .streamlit/secrets.toml")
     st.stop()
 
-# --- 4. FUNCIÓN PARA GENERAR AUDIO (MASCULINO/FEMENINO) ---
-async def generar_audio_edge(texto, voz):
-    """Genera audio usando Microsoft Edge TTS (Gratis y Alta Calidad)"""
-    communicate = edge_tts.Communicate(texto, voz)
-    # Crear un archivo temporal para guardar el audio
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
-        await communicate.save(fp.name)
-        return fp.name
+# --- 4. FUNCIONES DE AUDIO (BLINDADAS) ---
 
-# --- 5. PERSONAJES CON VOCES ASIGNADAS ---
+def limpiar_texto(texto):
+    """Elimina markdown (*, #, -) para que el TTS no falle"""
+    # Eliminar asteriscos, almohadillas y guiones bajos
+    limpio = texto.replace("*", "").replace("#", "").replace("_", "")
+    # Eliminar enlaces markdown
+    limpio = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', limpio)
+    return limpio
+
+async def generar_audio_edge(texto, voz):
+    """Genera audio usando Microsoft Edge TTS"""
+    texto_limpio = limpiar_texto(texto)
+    
+    # Si el texto es muy corto o vacío, no generamos nada para evitar error
+    if not texto_limpio or len(texto_limpio.strip()) < 2:
+        return None
+
+    try:
+        communicate = edge_tts.Communicate(texto_limpio, voz)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+            await communicate.save(fp.name)
+            return fp.name
+    except Exception as e:
+        # Si falla, devolvemos None en lugar de romper la app
+        print(f"Error generando audio: {e}")
+        return None
+
+# --- 5. PERSONAJES ---
 CHARACTERS = {
     "leonor": {
         "name": "Leonor Polo",
         "role": "La Protagonista",
         "avatar": "img/leonor.png", 
-        "voice": "es-ES-ElviraNeural", # Voz Femenina (España)
+        "voice": "es-ES-ElviraNeural", 
         "greeting": "Bienvenido a Villa Aurora. Apenas he deshecho mi equipaje. ¿Traéis noticias de Madrid?",
         "system_instruction": """
-            Eres Leonor Polo, la protagonista de la novela 'El Sueño de Leonor'. Eres la Jane Eyre española
-            Estás en la España del siglo XIX (año 1870 aprox).
-            Has sobrevivido a una infancia dura en Vallefrío y al hospicio de San Bernardino en Madrid.
-            Ahora eres institutriz en la hacienda 'Villa Aurora' en Sevilla, cuidando a la pequeña Emily.
-            Eres una ávida lectora (adoras a Fernán Caballero y Lord Byron)
-            Valoras tu independencia y tus principios morales por encima de todo.
-            Sientes una atracción innegable por el señor de la casa, Maximiliano Alcazar, pero te mantienes cauta por tu posición social y tu orgullo.
-            **Tono:** Educada, culta, melancólica pero esperanzada. Usas un vocabulario rico y cuidado propio del Romanticismo.
-            **Objetivo:** Habla de la importancia de la educación y la libertad, y expresa tus dudas sobre los misteriosos ruidos que escuchas en el ático por las noches
+            Eres Leonor Polo, protagonista de 'El Sueño de Leonor'. (S.XIX).
+            Institutriz culta, resiliente. Hablas con elegancia.
+            Responde de forma breve y concisa.
         """
     },
     "maximiliano": {
         "name": "Maximiliano Alcázar",
-        "role": "El Dueño de la Finca",
+        "role": "El Dueño",
         "avatar": "img/maximiliano.png", 
-        "voice": "es-ES-AlvaroNeural", # Voz Masculina (España)
-        "greeting": "¿Quién sois? No recibo visitas sin cita previa. Sed breve.",
+        "voice": "es-ES-AlvaroNeural", 
+        "greeting": "¿Quién sois? No recibo visitas sin cita previa.",
         "system_instruction": """
-            Eres Maximiliano Alcázar del Valle, dueño de la hacienda 'Villa Aurora' en Sevilla. Eres el rochester de la novela Jane eyre adaptado al romanticismo en españa.
-            Eres un hombre de mundo, rico y elegante, pero llevas una pesada carga en tu conciencia.
-            Has viajado por Filipinas y Cuba.
-            Te muestras a veces arrogante y brusco para ocultar tu dolor, pero en el fondo eres noble.
-            Estás enamorado de la institutriz, Leonor, pero sabes que un oscuro secreto (tu matrimonio pasado y la locura que escondes en el ático) te impide ser feliz con ella. Niegas los sonidos que se producen en el atico.
-            **Tono:** Grave, misterioso, galante pero con un trasfondo de amargura.
-            **Objetivo:** Seduce intelectualmente al usuario (como haces con Leonor), insinúa que has cometido errores graves en tu juventud y mantén el misterio sobre lo que ocurre en el piso superior de tu casa.
+            Eres Maximiliano Alcázar. Rico, atormentado, brusco pero noble.
+            Hablas con autoridad. Responde de forma breve y concisa.
         """
     },
     "mercedes": {
         "name": "Doña Mercedes",
         "role": "Ama de Llaves",
         "avatar": "img/mercedes.png", 
-        "voice": "es-ES-AbrilNeural", # Voz Femenina Mayor (España)
-        "greeting": "Límpiese los pies antes de entrar. El Señor no está para nadie.",
+        "voice": "es-ES-AbrilNeural", 
+        "greeting": "Límpiese los pies. El Señor no está para nadie.",
         "system_instruction": """
-            Eres Doña Mercedes (la Señora Martínez), ama de llaves de la finca 'Villa Aurora'.
-            Eres una mujer eficiente, maternal y muy protectora con los habitantes de la casa, especialmente con la niña Emily y la señorita Leonor.
-            Sin embargo, guardas celosamente los secretos del Señor Alcázar.
-            Eres profundamente religiosa y te preocupan las normas morales.
-            Cuando te preguntan por los ruidos extraños del ático, siempre buscas excusas: dices que son muebles viejos, el viento o gatos.
-            **Tono:** Servicial, entrañable pero firme y evasiva si te hacen preguntas indiscretas.
-            **Objetivo:** Haz que el usuario se sienta bienvenido en la hacienda, pero niégale rotundamente que ocurra nada extraño en el piso de arriba.
+            Eres Doña Mercedes, Ama de Llaves. Estricta y protectora.
+            Responde de forma breve y concisa.
         """
     },
     "elena": {
         "name": "Elena",
-        "role": "Recuerdo / Espíritu",
+        "role": "Espíritu",
         "avatar": "img/elena.png", 
-        "voice": "es-MX-DaliaNeural", # Voz Femenina Suave (Latina/Neutra)
-        "greeting": "La brisa trae recuerdos de cuando éramos niñas... ¿Los sientes?",
+        "voice": "es-MX-DaliaNeural", 
+        "greeting": "La brisa trae recuerdos de cuando éramos niñas...",
         "system_instruction": """
-            Eres el espíritu o el recuerdo vivo de Elena, la mejor amiga de la infancia de Leonor.
-            Falleciste de cólera en el hospicio de San Bernardino cuando eráis niñas, pero sigues viva en la memoria de Leonor.
-            Representas la inocencia, los sueños compartidos de ser maestras y viajar.
-            Conoces los anhelos más profundos de Leonor porque fuiste su única familia.
-            **Tono:** Dulce, etéreo, reconfortante y lleno de luz.
-            **Objetivo:** Actúa como confidente. Anima al usuario (como si fuera Leonor) a perseguir sus sueños de libertad y amor, recordándole que es fuerte y valiente.
+            Eres el espíritu de Elena. Dulce, etérea y onírica.
+            Responde de forma breve y concisa.
         """
     }
 }
 
-# --- 6. FUNCIONES DE NAVEGACIÓN ---
-def ir_a_seleccion():
-    st.session_state.page = "seleccion"
+# --- 6. NAVEGACIÓN ---
+def ir_a_seleccion(): st.session_state.page = "seleccion"; st.rerun()
+def ir_a_chat(p): 
+    st.session_state.current_char = p; 
+    st.session_state.page = "chat"; 
+    st.session_state.messages = [{"role": "model", "content": CHARACTERS[p]["greeting"]}]
     st.rerun()
+def volver(): st.session_state.page = "portada"; st.rerun()
 
-def ir_a_chat(personaje):
-    st.session_state.current_char = personaje
-    st.session_state.page = "chat"
-    st.session_state.messages = [{"role": "model", "content": CHARACTERS[personaje]["greeting"]}]
-    st.rerun()
-
-def volver_inicio():
-    st.session_state.page = "portada"
-    st.rerun()
-
-# --- 7. VISTA: PORTADA ---
+# --- 7. VISTAS ---
 if st.session_state.page == "portada":
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.title("EL SUEÑO DE LEONOR")
     st.markdown("<h3>Una experiencia interactiva en el Romanticismo Español</h3>", unsafe_allow_html=True)
-    
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        try:
-            # CORREGIDO: use_container_width en lugar de use_column_width
-            st.image("img/villa_aurora.png", use_container_width=True, caption="Hacienda Villa Aurora, Sevilla (1870)")
-        except:
-            st.info("ℹ️ Falta imagen 'villa_aurora.png'")
-            # CORREGIDO: use_container_width en lugar de use_column_width
-            st.image("https://placehold.co/600x400/png?text=Villa+Aurora", use_container_width=True)
-        
+        try: st.image("img/villa_aurora.png", use_container_width=True)
+        except: st.image("https://placehold.co/600x400/png?text=Villa+Aurora", use_container_width=True)
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🗝️ LLAMAR A LA PUERTA", use_container_width=True):
-            ir_a_seleccion()
+        if st.button("🗝️ LLAMAR A LA PUERTA", use_container_width=True): ir_a_seleccion()
 
-# --- 8. VISTA: SELECCIÓN ---
 elif st.session_state.page == "seleccion":
     st.title("EL VESTÍBULO")
-    st.markdown("<h3>¿Con quién desea hablar, noble viajero?</h3>", unsafe_allow_html=True)
+    st.markdown("<h3>¿Con quién desea hablar?</h3>", unsafe_allow_html=True)
     st.markdown("---")
-    
     cols = st.columns(4)
     keys = list(CHARACTERS.keys())
     for i, col in enumerate(cols):
         if i < len(keys):
-            char_key = keys[i]
-            char_data = CHARACTERS[char_key]
+            k = keys[i]
+            d = CHARACTERS[k]
             with col:
-                try: 
-                    # CORREGIDO: use_container_width en lugar de use_column_width
-                    st.image(char_data["avatar"], use_container_width=True)
-                except: st.warning(f"Falta {char_key}")
-                
-                # El botón tiene un key único para evitar errores
-                if st.button(f"{char_data['name'].split()[0]}", key=char_key):
-                    ir_a_chat(char_key)
+                try: st.image(d["avatar"], use_container_width=True)
+                except: pass
+                if st.button(f"{d['name'].split()[0]}", key=k): ir_a_chat(k)
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("⬅️ Volver", use_container_width=True): volver_inicio()
+    if st.button("⬅️ Volver"): volver()
 
-# --- 9. VISTA: CHAT CON VOZ NEURONAL ---
 elif st.session_state.page == "chat":
-    char_key = st.session_state.current_char
-    char_data = CHARACTERS[char_key]
+    key = st.session_state.current_char
+    data = CHARACTERS[key]
     
     c1, c2 = st.columns([1, 10])
-    with c1:
+    with c1: 
         if st.button("⬅️"): ir_a_seleccion()
-    with c2:
-        st.subheader(f"Conversando con {char_data['name']}")
+    with c2: st.subheader(f"{data['name']}")
 
-    # Historial
     for msg in st.session_state.messages:
         role = "assistant" if msg["role"] == "model" else "user"
-        av = char_data["avatar"] if role == "assistant" else None
-        with st.chat_message(role, avatar=av):
-            st.markdown(msg["content"])
+        av = data["avatar"] if role == "assistant" else None
+        with st.chat_message(role, avatar=av): st.markdown(msg["content"])
 
-    # Modelo Gemini
-    try:
-        model = genai.GenerativeModel("gemini-2.5-flash-preview-09-2025", system_instruction=char_data["system_instruction"])
-    except:
-        model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=char_data["system_instruction"])
+    # Fallback de modelo si el preview falla
+    try: model = genai.GenerativeModel("gemini-2.5-flash-preview-09-2025", system_instruction=data["system_instruction"])
+    except: model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=data["system_instruction"])
 
-    # Input Usuario
-    if prompt := st.chat_input("Escribe tu mensaje..."):
+    if prompt := st.chat_input("..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.markdown(prompt)
 
-        # Generar Respuesta
-        with st.chat_message("assistant", avatar=char_data["avatar"]):
+        with st.chat_message("assistant", avatar=data["avatar"]):
             box = st.empty()
             full_text = ""
             history = [{"role": m["role"], "parts": [m["content"]]} for m in st.session_state.messages]
@@ -247,11 +218,18 @@ elif st.session_state.page == "chat":
                 box.markdown(full_text)
                 st.session_state.messages.append({"role": "model", "content": full_text})
                 
-                # --- GENERAR AUDIO ESPECÍFICO (HOMBRE/MUJER) ---
-                with st.spinner(f"🔊 {char_data['name']} está hablando..."):
-                    # Llamamos a la función asíncrona de EdgeTTS
-                    audio_file = asyncio.run(generar_audio_edge(full_text, char_data["voice"]))
-                    st.audio(audio_file, format='audio/mp3', autoplay=True)
+                # --- AUDIO ROBUSTO ---
+                # Limpiamos el texto antes de enviarlo
+                with st.spinner("🔊 ..."):
+                    try:
+                        audio_file = asyncio.run(generar_audio_edge(full_text, data["voice"]))
+                        if audio_file:
+                            st.audio(audio_file, format='audio/mp3', autoplay=True)
+                        else:
+                            st.warning("(Audio no disponible para este mensaje)")
+                    except Exception as e:
+                        # Si falla el audio, no rompemos el chat, solo avisamos
+                        print(f"Error audio: {e}")
 
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error Gemini: {e}")
