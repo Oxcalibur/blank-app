@@ -19,26 +19,37 @@ st.set_page_config(
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lora:ital@0;1&display=swap');
+    
     html, body, [class*="css"] { font-family: 'Lora', serif; background-color: #fdfbf7; color: #4b3621 !important; }
     h1 { font-family: 'Cinzel', serif; color: #5e3c38 !important; text-align: center; text-transform: uppercase; text-shadow: 2px 2px 4px #d4c5b0; }
     h3 { color: #8b5e3c !important; text-align: center; font-style: italic; }
+    
     .stButton button { background-color: transparent; border: 2px solid #8b5e3c; color: #5e3c38 !important; border-radius: 10px; transition: 0.3s; font-weight: bold; }
     .stButton button:hover { background-color: #5e3c38; color: white !important; transform: scale(1.05); }
     .stChatMessage { background-color: #ffffff; border: 1px solid #e0d0c0; border-radius: 15px; }
     .stChatMessage p { color: #2c1e1a !important; }
+    
     #MainMenu, footer, header {visibility: hidden;}
     .stTextInput input { color: #2c1e1a !important; background-color: #ffffff !important; }
     
+    /* MODIFICACIÓN: CAJA DE SINOPSIS GÓTICA */
     .sinopsis-box {
         background-color: #fdfbf7;
-        border: 1px solid #d4c5b0;
-        padding: 20px;
+        color: #4b3621 !important;
+        border: 2px solid #d4c5b0; /* Borde un poco más grueso */
+        padding: 25px;
         border-radius: 5px;
-        font-family: 'Lora', serif;
-        font-style: italic;
+        
+        /* AQUI CAMBIAMOS LA FUENTE A 'CINZEL' (ESTILO GÓTICO/ROMÁNTICO) */
+        font-family: 'Cinzel', serif; 
+        font-size: 1.1em; /* Un poco más grande para leerse bien */
+        font-weight: 500;
+        
         line-height: 1.6;
+        margin-top: 20px;
         margin-bottom: 20px;
         text-align: justify;
+        box-shadow: 5px 5px 15px rgba(0,0,0,0.05); /* Sombra suave */
     }
     
     .cita-sugerida {
@@ -49,7 +60,7 @@ st.markdown("""
         margin-bottom: 10px;
         border-radius: 5px;
         font-family: 'Lora', serif;
-        color: #5e3c38;
+        color: #5e3c38 !important;
         box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
     }
     .cita-titulo { font-weight: bold; font-size: 0.9em; text-transform: uppercase; margin-bottom: 5px; }
@@ -71,7 +82,7 @@ except:
     st.error("⚠️ Falta API Key en secrets.toml")
     st.stop()
 
-# --- 4. PAUTAS COMUNES (GLOBALES) ---
+# --- 4. PAUTAS COMUNES ---
 PAUTAS_COMUNES = """
 DIRECTRICES OBLIGATORIAS DE FORMATO Y ESTILO:
 1. BREVEDAD: Tus respuestas deben ser CORTAS y concisas (máximo 2 o 3 oraciones). Estamos en un diálogo fluido.
@@ -82,9 +93,9 @@ DIRECTRICES OBLIGATORIAS DE FORMATO Y ESTILO:
 # --- 5. TEXTOS Y FRAGMENTOS ---
 SINOPSIS_TEXTO = """
 Inspirada en la inmortal obra de Charlotte Brontë, “Jane Eyre”. Pasión, misterio y una mujer que desafía el destino. Una historia vibrante con la intensidad de un clásico.
-
+<br><br>
 Leonor Polo no es una mujer común. Sobreviviente de una infancia cruel y de un hospicio gris, se convierte en institutriz en la deslumbrante Villa Aurora, mansión perteneciente a una familia adinerada de la Sevilla del siglo XIX. Pronto, el carismático y cultivado patrón, Maximiliano Alcázar, despierta en ella una pasión prohibida.
-
+<br><br>
 Sin embargo, la sombra de un secreto se cierne sobre la rica hacienda, amenazando con destruirlo todo. Lejos, en el brumoso Londres Victoriano, Leonor se reinventa como librera, forjando su independencia y labrándose un camino por sí misma.
 """
 
@@ -121,6 +132,8 @@ LIBRO_FRAGMENTOS = {
 # --- 6. FUNCIONES AUXILIARES ---
 def limpiar_para_audio(texto):
     texto = re.sub(r'\[\[REF:\d+\]\]', '', texto)
+    # Quitamos tags HTML si los hay
+    texto = re.sub(r'<[^>]*>', '', texto) 
     texto = re.sub(r'[\*#_`~]', '', texto)
     texto = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', texto)
     return texto.strip()
@@ -139,7 +152,6 @@ def preparar_prompt_inteligente(char_key, base_instruction):
     for i, frag in enumerate(fragmentos):
         texto_fragmentos += f"FRAGMENTO_{i}: {frag}\n"
     
-    # Combinamos: Instrucción Personal + Pautas Comunes + Memoria RAG
     instruccion_final = f"""
     {base_instruction}
     
@@ -157,92 +169,56 @@ def preparar_prompt_inteligente(char_key, base_instruction):
 # --- 7. PERSONAJES ---
 CHARACTERS = {
     "leonor": {
-        "name": "Leonor Polo",
-        "short_name": "Leonor",
-        "role": "La Protagonista",
-        "avatar": "img/leonor.png", 
-        "voice": "es-ES-ElviraNeural", 
-        "speed": "-5%",
-        "greeting": "Bienvenido a Villa Aurora. Apenas he deshecho mi equipaje. ¿Traéis noticias de Madrid?",
+        "name": "Leonor Polo", "short_name": "Leonor", "role": "Protagonista", "avatar": "img/leonor.png", 
+        "voice": "es-ES-ElviraNeural", "speed": "-5%",
+        "greeting": "Bienvenido a Villa Aurora. El calor es sofocante... ¿Traéis noticias?",
         "base_instruction": """
-            Eres Leonor Polo, la protagonista de la novela 'El Sueño de Leonor'. Eres la Jane Eyre española
-            Estás en la España del siglo XIX (año 1870 aprox).
-            Has sobrevivido a una infancia dura en Vallefrío y al hospicio de San Bernardino en Madrid.
-            Ahora eres institutriz en la hacienda 'Villa Aurora' en Sevilla, cuidando a la pequeña Emily.
-            Eres una ávida lectora (adoras a Fernán Caballero y Lord Byron)
-            Valoras tu independencia y tus principios morales por encima de todo.
-            Sientes una atracción innegable por el señor de la casa, Maximiliano Alcazar, pero te mantienes cauta por tu posición social y tu orgullo.
-            **Tono:** Educada, culta, melancólica pero esperanzada. Usas un vocabulario rico y cuidado propio del Romanticismo.
-            **Objetivo:** Habla de la importancia de la educación y la libertad, y expresa tus dudas sobre los misteriosos ruidos que escuchas en el ático por las noches
+            Eres Leonor Polo, la protagonista. (S.XIX).
+            Has sobrevivido a una infancia dura y al hospicio.
+            Ahora eres institutriz en 'Villa Aurora' (Sevilla).
+            Amas a Maximiliano pero te mantienes cauta.
+            **Tono:** Educada, culta, melancólica.
         """
     },
     "maximiliano": {
-        "name": "Maximiliano Alcázar",
-        "short_name": "Maximiliano",
-        "role": "El Dueño",
-        "avatar": "img/maximiliano.png", 
-        "voice": "es-ES-AlvaroNeural", 
-        "speed": "-5%",
+        "name": "Maximiliano Alcázar", "short_name": "Maximiliano", "role": "Dueño", "avatar": "img/maximiliano.png", 
+        "voice": "es-ES-AlvaroNeural", "speed": "-5%",
         "greeting": "¿Quién sois? No recibo visitas sin cita previa.",
         "base_instruction": """
-            Eres Maximiliano Alcázar del Valle, dueño de la hacienda 'Villa Aurora' en Sevilla. Eres el rochester de la novela Jane eyre adaptado al romanticismo en españa.
-            Eres un hombre de mundo, rico y elegante, pero llevas una pesada carga en tu conciencia.
-            Has viajado por Filipinas y Cuba.
-            Te muestras a veces arrogante y brusco para ocultar tu dolor, pero en el fondo eres noble.
-            Estás enamorado de la institutriz, Leonor, pero sabes que un oscuro secreto (tu matrimonio pasado y la locura que escondes en el ático) te impide ser feliz con ella. Niegas los sonidos que se producen en el atico.
-            Habla con autoridad y calma
-            **Tono:** Grave, misterioso, galante pero con un trasfondo de amargura.
-            **Objetivo:** Seduce intelectualmente al usuario (como haces con Leonor), insinúa que has cometido errores graves en tu juventud y mantén el misterio sobre lo que ocurre en el piso superior de tu casa.
+            Eres Maximiliano Alcázar. Dueño de 'Villa Aurora'.
+            Hombre de mundo, rico, ciego y manco (herido).
+            Ocultas un secreto en el ático y niegas los ruidos.
+            **Tono:** Grave, misterioso, arrogante pero noble en el fondo.
         """
     },
     "mercedes": {
-        "name": "Doña Mercedes",
-        "short_name": "Doña Mercedes",
-        "role": "Ama de Llaves",
-        "avatar": "img/mercedes.png", 
-        "voice": "es-ES-AbrilNeural", 
-        "speed": "+0%",
+        "name": "Doña Mercedes", "short_name": "Doña Mercedes", "role": "Ama de Llaves", "avatar": "img/mercedes.png", 
+        "voice": "es-ES-AbrilNeural", "speed": "+0%",
         "greeting": "Límpiese los pies. El Señor no está para nadie.",
         "base_instruction": """
-            Eres Doña Mercedes (la Señora Martínez), ama de llaves de la finca 'Villa Aurora'.
-            Eres una mujer eficiente, maternal y muy protectora con los habitantes de la casa, especialmente con la niña Emily y la señorita Leonor.
-            Sin embargo, guardas celosamente los secretos del Señor Alcázar.
-            Eres profundamente religiosa y te preocupan las normas morales.
-            Cuando te preguntan por los ruidos extraños del ático, siempre buscas excusas: dices que son muebles viejos, el viento o gatos.
-            **Tono:** Servicial, entrañable pero firme y evasiva si te hacen preguntas indiscretas.
-            **Objetivo:** Haz que el usuario se sienta bienvenido en la hacienda, pero niégale rotundamente que ocurra nada extraño en el piso de arriba.
+            Eres Doña Mercedes, ama de llaves.
+            Religiosa, eficiente y protectora.
+            Guardas los secretos del Señor.
+            **Tono:** Servicial pero firme.
         """
     },
     "elena": {
-        "name": "Elena",
-        "short_name": "Elena",
-        "role": "Espíritu",
-        "avatar": "img/elena.png", 
-        "voice": "es-ES-XimenaNeural", 
-        "greeting": "La brisa trae recuerdos de cuando éramos niñas...",
-        "speed": "-20%",
+        "name": "Elena", "short_name": "Elena", "role": "Espíritu", "avatar": "img/elena.png", 
+        "voice": "es-ES-XimenaNeural", "greeting": "La brisa trae recuerdos...", "speed": "-20%",
         "base_instruction": """
-            Eres el espíritu o el recuerdo vivo de Elena, la mejor amiga de la infancia de Leonor.
-            Falleciste de cólera en el hospicio de San Bernardino cuando eráis niñas, pero sigues viva en la memoria de Leonor.
-            Representas la inocencia, los sueños compartidos de ser maestras y viajar.
-            Conoces los anhelos más profundos de Leonor porque fuiste su única familia.
-            Habla muy lento y onírico.
-            **Tono:** Dulce, etéreo, reconfortante y lleno de luz.
-            **Objetivo:** Actúa como confidente. Anima al usuario (como si fuera Leonor) a perseguir sus sueños de libertad y amor, recordándole que es fuerte y valiente.
+            Eres el espíritu de Elena, amiga de la infancia.
+            Representas la inocencia y los sueños.
+            **Tono:** Dulce, etéreo, onírico.
         """
     },
     "susana": {
-        "name": "Susana (Autora)",
-        "short_name": "Susana",
-        "role": "La Autora",
-        "avatar": "img/susana.png",
-        "voice": "es-ES-ElviraNeural",
-        "speed": "+0%",
+        "name": "Susana (Autora)", "short_name": "Susana", "role": "La Autora", "avatar": "img/susana.png", 
+        "voice": "es-ES-ElviraNeural", "speed": "+0%",
         "greeting": "Hola, soy Susana, la autora. Pregúntame sobre cómo creé a Leonor.",
         "base_instruction": """
             Eres Susana, autora de 'El Sueño de Leonor'.
-            Tu obra es ficción histórica (S.XIX), saga familiar y empoderamiento femenino.
-            Responde de forma cercana y apasionada por la literatura.
+            Novela de ficción histórica (S.XIX), empoderamiento y misterio.
+            **Tono:** Cercano, apasionado por la literatura.
         """
     }
 }
@@ -263,23 +239,25 @@ if st.session_state.page == "portada":
     st.title("EL SUEÑO DE LEONOR")
     st.markdown("<h3>Una novela de pasión y misterio en el siglo XIX</h3>", unsafe_allow_html=True)
     
-    col1, col2 = st.columns([1, 1])
-    with col1:
+    # 1. IMAGEN CENTRADA (usando 3 columnas)
+    c1, c2, c3 = st.columns([1, 2, 1])
+    with c2:
         try: st.image("img/villa_aurora.png", use_container_width=True)
         except: st.image("https://placehold.co/600x400/png?text=Villa+Aurora", use_container_width=True)
-        
-    with col2:
-        st.markdown(f'<div class="sinopsis-box">{SINOPSIS_TEXTO}</div>', unsafe_allow_html=True)
-        
-        if st.button("🔊 Escuchar Sinopsis"):
+    
+    # 2. SINOPSIS DEBAJO (Tipografía Gótica 'Cinzel')
+    st.markdown(f'<div class="sinopsis-box">{SINOPSIS_TEXTO}</div>', unsafe_allow_html=True)
+    
+    # 3. BOTONES DEBAJO DE LA SINOPSIS
+    col_a, col_b = st.columns([1, 1])
+    with col_a:
+        if st.button("🔊 Escuchar Sinopsis", use_container_width=True):
             with st.spinner("Leyendo sinopsis..."):
                 try:
                     audio_file = asyncio.run(generar_audio_edge(SINOPSIS_TEXTO, "es-ES-ElviraNeural", "+0%"))
                     if audio_file: st.audio(audio_file, format='audio/mp3', autoplay=True)
-                except Exception as e:
-                    st.error(f"Error audio: {e}")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
+                except Exception as e: st.error(f"Error: {e}")
+    with col_b:
         if st.button("🗝️ ENTRAR EN LA NOVELA", use_container_width=True): ir_a_seleccion()
 
 elif st.session_state.page == "seleccion":
@@ -319,20 +297,17 @@ elif st.session_state.page == "chat":
         fragmentos_pj = LIBRO_FRAGMENTOS.get(key, [])
         if 0 <= idx < len(fragmentos_pj):
             frag_text = fragmentos_pj[idx]
-            
             st.markdown(f"""
             <div class="cita-sugerida">
                 <div class="cita-titulo">📜 {data['short_name']} sugiere leer:</div>
                 <div class="cita-texto">"{frag_text}"</div>
             </div>
             """, unsafe_allow_html=True)
-            
             if st.button("🔊 Leer fragmento"):
                  st.session_state.messages.append({"role": "model", "content": f"_(Lee el pasaje)_ {frag_text}"})
                  st.session_state.suggested_fragment = None 
                  st.rerun() 
 
-    # Inyección de prompt inteligente + pautas comunes
     prompt_completo = preparar_prompt_inteligente(key, data["base_instruction"])
     try: model = genai.GenerativeModel("gemini-2.5-flash-preview-09-2025", system_instruction=prompt_completo)
     except: model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=prompt_completo)
