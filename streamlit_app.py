@@ -32,26 +32,32 @@ st.markdown("""
     #MainMenu, footer, header {visibility: hidden;}
     .stTextInput input { color: #2c1e1a !important; background-color: #ffffff !important; }
     
-    /* MODIFICACIÓN: CAJA DE SINOPSIS COMPACTA */
+    /* CAJA DE SINOPSIS COMPACTA */
     .sinopsis-box {
         background-color: #fdfbf7;
         color: #4b3621 !important;
         border: 2px solid #d4c5b0;
-        
-        /* Reducimos el relleno para que ocupe menos verticalmente */
+        box-sizing: border-box; 
+        width: 100%;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
         padding: 15px; 
         border-radius: 5px;
-        
-        /* Fuente Cinzel (Gótica legible) pero más pequeña */
         font-family: 'Cinzel', serif; 
-        font-size: 0.95em; /* Letra más pequeña */
+        font-size: 0.9em;
         font-weight: 500;
-        
-        line-height: 1.4; /* Líneas más juntas */
-        margin-top: 10px; /* Pegado a la foto */
+        line-height: 1.4;
+        margin-top: 5px; 
         margin-bottom: 15px;
         text-align: justify;
         box-shadow: 5px 5px 15px rgba(0,0,0,0.05);
+    }
+    
+    /* Truco para avatares */
+    div[data-testid="stImage"] img {
+        max-height: 300px;
+        object-fit: contain;
     }
     
     .cita-sugerida {
@@ -93,7 +99,6 @@ DIRECTRICES OBLIGATORIAS DE FORMATO Y ESTILO:
 """
 
 # --- 5. TEXTOS Y FRAGMENTOS ---
-# He quitado los <br><br> dobles para ahorrar espacio vertical
 SINOPSIS_TEXTO = """
 Inspirada en la inmortal obra de Charlotte Brontë, “Jane Eyre”. Pasión, misterio y una mujer que desafía el destino. Una historia vibrante con la intensidad de un clásico.
 <br>
@@ -236,6 +241,8 @@ CHARACTERS = {
             Eres Susana, autora de 'El Sueño de Leonor'.
             Tu obra es ficción histórica (S.XIX), saga familiar y empoderamiento femenino.
             Responde de forma cercana y apasionada por la literatura.
+            Eres filologa Inglesa, apasionada de la literatura romantica del siglo xix y tus escritoras favoritas son las hermanas bronte
+
         """
     }
 }
@@ -256,19 +263,14 @@ if st.session_state.page == "portada":
     st.title("EL SUEÑO DE LEONOR")
     st.markdown("<h3>Una novela de pasión y misterio en el siglo XIX</h3>", unsafe_allow_html=True)
     
-    # --- ESTRUCTURA DE COLUMNAS MODIFICADA PARA QUE SINOPSIS TENGA EL MISMO ANCHO ---
-    # Usamos una columna central ancha (ratio 1:2:1) y metemos TODO dentro de ella
     c1, c2, c3 = st.columns([1, 2, 1])
     
     with c2:
-        # 1. IMAGEN
         try: st.image("img/villa_aurora.png", use_container_width=True)
         except: st.image("https://placehold.co/600x400/png?text=Villa+Aurora", use_container_width=True)
         
-        # 2. SINOPSIS (Justo debajo, mismo ancho porque está en la misma columna)
         st.markdown(f'<div class="sinopsis-box">{SINOPSIS_TEXTO}</div>', unsafe_allow_html=True)
         
-        # 3. BOTONES (También debajo, mismo ancho)
         col_a, col_b = st.columns([1, 1])
         with col_a:
             if st.button("🔊 Escuchar Sinopsis", use_container_width=True):
@@ -281,19 +283,52 @@ if st.session_state.page == "portada":
             if st.button("🗝️ ENTRAR EN LA NOVELA", use_container_width=True): ir_a_seleccion()
 
 elif st.session_state.page == "seleccion":
-    st.title("EL VESTÍBULO")
-    st.markdown("Elige tu interlocutor:")
-    keys = list(CHARACTERS.keys())
-    cols = st.columns(len(keys))
+    # --- MODIFICACIÓN DE DISEÑO: TÍTULO Y AUTORA ENCABEZADO ---
+    # Creamos dos columnas: una ancha para el título y otra estrecha para Susana a la derecha
+    c_header, c_author = st.columns([4, 1])
     
-    for i, col in enumerate(cols):
-        k = keys[i]
-        d = CHARACTERS[k]
-        with col:
-            try: st.image(d["avatar"], use_container_width=True)
-            except: pass
-            if st.button(d["short_name"], key=k): ir_a_chat(k)
-            
+    with c_header:
+        st.title("EL VESTÍBULO")
+        st.markdown("<h3>Elige tu interlocutor:</h3>", unsafe_allow_html=True)
+        
+    with c_author:
+        # Aquí mostramos a Susana separada, en la esquina
+        s_data = CHARACTERS["susana"]
+        try: st.image(s_data["avatar"], width=100) # Imagen más pequeña
+        except: pass
+        if st.button("La Autora", key="susana_btn"): # Botón específico
+            ir_a_chat("susana")
+
+    st.markdown("---") # Línea separadora
+
+    # --- GRID DEL RESTO DE PERSONAJES (Excluyendo a Susana) ---
+    personajes_grid = [k for k in CHARACTERS.keys() if k != "susana"]
+    
+    # Fila 1: Primeros 3 personajes
+    row1 = st.columns(3)
+    for i in range(3):
+        if i < len(personajes_grid):
+            k = personajes_grid[i]
+            d = CHARACTERS[k]
+            with row1[i]:
+                try: st.image(d["avatar"], use_container_width=True)
+                except: pass
+                if st.button(d["short_name"], key=k): ir_a_chat(k)
+    
+    # Fila 2: Resto (Si hay más de 3)
+    if len(personajes_grid) > 3:
+        st.markdown("<br>", unsafe_allow_html=True)
+        row2 = st.columns(3) 
+        for i in range(3, len(personajes_grid)):
+            col_idx = i - 3
+            if col_idx < 3:
+                k = personajes_grid[i]
+                d = CHARACTERS[k]
+                with row2[col_idx]:
+                    try: st.image(d["avatar"], use_container_width=True)
+                    except: pass
+                    if st.button(d["short_name"], key=k): ir_a_chat(k)
+
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("⬅️ Volver a la portada"): volver()
 
@@ -307,4 +342,72 @@ elif st.session_state.page == "chat":
     with c2: st.subheader(f"{data['name']}")
 
     for msg in st.session_state.messages:
-        role = "assistant" if msg["role"]
+        role = "assistant" if msg["role"] == "model" else "user"
+        av = data["avatar"] if role == "assistant" else None
+        texto_mostrar = re.sub(r'\[\[REF:\d+\]\]', '', msg["content"])
+        with st.chat_message(role, avatar=av): st.markdown(texto_mostrar)
+
+    if st.session_state.suggested_fragment is not None:
+        idx = st.session_state.suggested_fragment
+        fragmentos_pj = LIBRO_FRAGMENTOS.get(key, [])
+        if 0 <= idx < len(fragmentos_pj):
+            frag_text = fragmentos_pj[idx]
+            st.markdown(f"""
+            <div class="cita-sugerida">
+                <div class="cita-titulo">📜 {data['short_name']} sugiere leer:</div>
+                <div class="cita-texto">"{frag_text}"</div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("🔊 Leer fragmento"):
+                 st.session_state.messages.append({"role": "model", "content": f"_(Lee el pasaje)_ {frag_text}"})
+                 st.session_state.suggested_fragment = None 
+                 st.rerun() 
+
+    prompt_completo = preparar_prompt_inteligente(key, data["base_instruction"])
+    try: model = genai.GenerativeModel("gemini-2.5-flash-preview-09-2025", system_instruction=prompt_completo)
+    except: model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=prompt_completo)
+
+    if prompt := st.chat_input("..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.session_state.suggested_fragment = None 
+        with st.chat_message("user"): st.markdown(prompt)
+
+        with st.chat_message("assistant", avatar=data["avatar"]):
+            box = st.empty()
+            full_text = ""
+            history_clean = []
+            
+            for m in st.session_state.messages:
+                clean_content = re.sub(r'\[\[REF:\d+\]\]', '', m["content"])
+                history_clean.append({"role": m["role"], "parts": [clean_content]})
+
+            try:
+                chat = model.start_chat(history=history_clean[:-1])
+                response = chat.send_message(prompt, stream=True)
+                
+                for chunk in response:
+                    if chunk.text:
+                        full_text += chunk.text
+                        display_text = re.sub(r'\[\[REF:\d+\]\]', '', full_text)
+                        box.markdown(display_text + "▌")
+                        time.sleep(0.01)
+                
+                final_display = re.sub(r'\[\[REF:\d+\]\]', '', full_text)
+                box.markdown(final_display)
+                st.session_state.messages.append({"role": "model", "content": full_text})
+                
+                match = re.search(r'\[\[REF:(\d+)\]\]', full_text)
+                if match:
+                    ref_id = int(match.group(1))
+                    st.session_state.suggested_fragment = ref_id
+                    st.rerun() 
+
+                with st.spinner("🔊 ..."):
+                    try:
+                        velocidad = data.get("speed", "-10%")
+                        audio_file = asyncio.run(generar_audio_edge(full_text, data["voice"], velocidad))
+                        if audio_file: st.audio(audio_file, format='audio/mp3', autoplay=True)
+                    except: pass
+
+            except Exception as e:
+                st.error(f"Error: {e}")
