@@ -1,104 +1,99 @@
 import streamlit as st
 import google.generativeai as genai
-import edge_tts
-import asyncio
+from elevenlabs.client import ElevenLabs
+from elevenlabs import VoiceSettings
 import tempfile
-import time
 import re 
-import random
+import time
 
-# --- 1. CONFIGURACIÓN ---
+# --- 1. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
-    page_title="El Sueño de Leonor - Experiencia Interactiva",
+    page_title="El Sueño de Leonor",
     page_icon="🌹",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# ESTILOS CSS
+# --- 2. ESTILOS CSS ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lora:ital@0;1&display=swap');
     
-    html, body, [class*="css"] { font-family: 'Lora', serif; background-color: #fdfbf7; color: #4b3621 !important; }
-    h1 { font-family: 'Cinzel', serif; color: #5e3c38 !important; text-align: center; text-transform: uppercase; text-shadow: 2px 2px 4px #d4c5b0; }
-    h3 { color: #8b5e3c !important; text-align: center; font-style: italic; }
+    /* FONDO Y TEXTOS */
+    .stApp, div[data-testid="stAppViewContainer"] {
+        background-color: #fdfbf7 !important;
+    }
     
-    .stButton button { background-color: transparent; border: 2px solid #8b5e3c; color: #5e3c38 !important; border-radius: 10px; transition: 0.3s; font-weight: bold; }
-    .stButton button:hover { background-color: #5e3c38; color: white !important; transform: scale(1.05); }
-    .stChatMessage { background-color: #ffffff; border: 1px solid #e0d0c0; border-radius: 15px; }
-    .stChatMessage p { color: #2c1e1a !important; }
+    h1, h2, h3, h4, h5, h6, p, div, span, li, a, label, button, input { 
+        color: #4b3621 !important; 
+        font-family: 'Lora', serif !important; 
+    }
     
-    #MainMenu, footer, header {visibility: hidden;}
-    .stTextInput input { color: #2c1e1a !important; background-color: #ffffff !important; }
+    /* TÍTULOS */
+    h1 { 
+        font-family: 'Cinzel', serif !important; 
+        text-align: center; 
+        text-transform: uppercase; 
+        text-shadow: 2px 2px 4px #d4c5b0; 
+        margin: 10px 0 !important;
+    }
+    h3 { font-style: italic; text-align: center; }
     
-    /* CAJA DE SINOPSIS COMPACTA */
-    .sinopsis-box {
-        background-color: #fdfbf7;
-        color: #4b3621 !important;
-        border: 2px solid #d4c5b0;
-        box-sizing: border-box; 
+    /* BOTONES */
+    .stButton button { 
+        background-color: transparent !important; 
+        border: 2px solid #8b5e3c !important; 
+        border-radius: 10px; 
+        font-weight: bold; 
         width: 100%;
-        display: block;
-        margin-left: auto;
-        margin-right: auto;
-        padding: 15px; 
-        border-radius: 5px;
-        font-family: 'Cinzel', serif; 
-        font-size: 0.9em;
-        font-weight: 500;
-        line-height: 1.4;
-        margin-top: 5px; 
-        margin-bottom: 15px;
-        text-align: justify;
-        box-shadow: 5px 5px 15px rgba(0,0,0,0.05);
     }
+    .stButton button:hover { 
+        background-color: #5e3c38 !important; 
+        transform: scale(1.02); 
+    }
+    .stButton button:hover p { color: #ffffff !important; }
     
-    /* Truco para avatares */
-    div[data-testid="stImage"] img {
-        max-height: 300px;
-        object-fit: contain;
-    }
+    /* CHAT Y CAJAS */
+    .stChatMessage { background-color: #ffffff !important; border: 1px solid #e0d0c0; border-radius: 15px; }
+    .sinopsis-box { background-color: #fffaf0; border: 1px solid #d4c5b0; padding: 20px; border-radius: 8px; font-family: 'Cinzel', serif !important; text-align: justify; margin-bottom: 20px; }
+    .cita-sugerida { background-color: #f4eadd; border-left: 4px solid #8b5e3c; padding: 15px; margin: 15px 0; border-radius: 5px; }
     
-    .cita-sugerida {
-        background-color: #f4eadd;
-        border-left: 4px solid #8b5e3c;
-        padding: 15px;
-        margin-top: 10px;
-        margin-bottom: 10px;
-        border-radius: 5px;
-        font-family: 'Lora', serif;
-        color: #5e3c38 !important;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-    }
-    .cita-titulo { font-weight: bold; font-size: 0.9em; text-transform: uppercase; margin-bottom: 5px; }
-    .cita-texto { font-style: italic; font-size: 1.05em; line-height: 1.5; }
+    /* IMÁGENES */
+    div[data-testid="stImage"] { margin: auto; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. ESTADO ---
+# --- 3. ESTADO ---
 if "page" not in st.session_state: st.session_state.page = "portada"
 if "current_char" not in st.session_state: st.session_state.current_char = None
 if "messages" not in st.session_state: st.session_state.messages = []
 if "suggested_fragment" not in st.session_state: st.session_state.suggested_fragment = None
+if "last_audio" not in st.session_state: st.session_state.last_audio = None
 
-# --- 3. API ---
+# --- 4. API SETUP ---
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=api_key)
 except:
-    st.error("⚠️ Falta API Key en secrets.toml")
+    st.error("⚠️ Falta GOOGLE_API_KEY en secrets.toml")
     st.stop()
 
-# --- 4. PAUTAS COMUNES ---
+# Configuración ElevenLabs
+eleven_client = None
+if "ELEVENLABS_API_KEY" in st.secrets:
+    try:
+        eleven_client = ElevenLabs(api_key=st.secrets["ELEVENLABS_API_KEY"])
+    except Exception as e:
+        st.error(f"Error conectando con ElevenLabs: {e}")
+
+# --- 5. TEXTOS Y DATOS ---
 PAUTAS_COMUNES = """
 DIRECTRICES OBLIGATORIAS DE FORMATO Y ESTILO:
 1. BREVEDAD: Tus respuestas deben ser CORTAS y concisas (máximo 2 o 3 oraciones). Estamos en un diálogo fluido.
 2. FORMATO DE VOZ: Estás hablando, no escribiendo. NO uses nunca markdown (ni negritas, ni cursivas). NO uses asteriscos para describir acciones (*suspira*). Solo texto plano.
-3. IDIOMA: Responde siempre en Español.
+3. IDIOMA: Responde siempre en Español de España (Castellano).
 """
 
-# --- 5. TEXTOS Y FRAGMENTOS ---
 SINOPSIS_TEXTO = """
 Inspirada en la inmortal obra de Charlotte Brontë, “Jane Eyre”. Pasión, misterio y una mujer que desafía el destino. Una historia vibrante con la intensidad de un clásico.
 <br>
@@ -137,47 +132,53 @@ LIBRO_FRAGMENTOS = {
     ]
 }
 
-# --- 6. FUNCIONES AUXILIARES ---
+# --- 6. FUNCIÓN DE AUDIO (ELEVENLABS API v1.0+ CORREGIDA) ---
 def limpiar_para_audio(texto):
     texto = re.sub(r'\[\[REF:\d+\]\]', '', texto)
-    texto = re.sub(r'<[^>]*>', '', texto) 
-    texto = re.sub(r'[\*#_`~]', '', texto)
-    texto = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', texto)
-    return texto.strip()
+    return re.sub(r'[\*#_`~]', '', texto).strip()
 
-async def generar_audio_edge(texto, voz, velocidad="-10%"):
-    clean_text = limpiar_para_audio(texto)
-    if not clean_text or len(clean_text) < 2: return None
-    communicate = edge_tts.Communicate(clean_text, voz, rate=velocidad)
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
-        await communicate.save(fp.name)
-        return fp.name
+def generar_audio(texto, voice_id):
+    if not eleven_client:
+        st.warning("⚠️ Configura ELEVENLABS_API_KEY para escuchar el audio.")
+        return None
+        
+    try:
+        clean_text = limpiar_para_audio(texto)
+        if not clean_text: return None
+        
+        # Sintaxis ElevenLabs v1.0+
+        audio_generator = eleven_client.text_to_speech.convert(
+            text=clean_text,
+            voice_id=voice_id,
+            model_id="eleven_multilingual_v2", 
+            output_format="mp3_44100_128",
+            voice_settings=VoiceSettings(
+                stability=0.5, 
+                similarity_boost=0.75,
+                style=0.0,
+                use_speaker_boost=True
+            )
+        )
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+            for chunk in audio_generator:
+                if chunk: fp.write(chunk)
+            return fp.name
 
-def preparar_prompt_inteligente(char_key, base_instruction):
-    fragmentos = LIBRO_FRAGMENTOS.get(char_key, [])
-    texto_fragmentos = ""
-    for i, frag in enumerate(fragmentos):
-        texto_fragmentos += f"FRAGMENTO_{i}: {frag}\n"
-    
-    instruccion_final = f"""
-    {base_instruction}
-    
-    {PAUTAS_COMUNES}
-    
-    --- MEMORIA LITERARIA ---
-    Estos son fragmentos literales de tu historia:
-    {texto_fragmentos}
-    
-    INSTRUCCIÓN DE INTELIGENCIA:
-    Si tu respuesta toca un tema relacionado con un fragmento, añade al final [[REF:número]].
-    """
-    return instruccion_final
+    except Exception as e:
+        st.error(f"Error ElevenLabs: {e}")
+        return None
 
-# --- 7. PERSONAJES ---
+# --- 7. CONFIGURACIÓN DE PERSONAJES (IDs DEFINITIVOS) ---
+def safe_image(path, url_backup, width=None):
+    try: st.image(path, width=width, use_container_width=(width is None))
+    except: st.image(url_backup, width=width, use_container_width=(width is None))
+
 CHARACTERS = {
     "leonor": {
-        "name": "Leonor Polo", "short_name": "Leonor", "role": "Protagonista", "avatar": "img/leonor.png", 
-        "voice": "es-ES-ElviraNeural", "speed": "-5%",
+        "name": "Leonor Polo", "short_name": "Leonor", "avatar": "img/leonor.png", 
+        "backup": "https://cdn-icons-png.flaticon.com/512/4086/4086600.png",
+        "voice_id": "21m00Tcm4TlvDq8ikWAM", 
         "greeting": "Bienvenido a Villa Aurora. Apenas he deshecho mi equipaje. ¿Traéis noticias de Madrid?",
         "base_instruction": """
             Eres Leonor Polo, la protagonista de la novela 'El Sueño de Leonor'. Eres la Jane Eyre española
@@ -192,8 +193,9 @@ CHARACTERS = {
         """
     },
     "maximiliano": {
-        "name": "Maximiliano Alcázar", "short_name": "Maximiliano", "role": "Dueño", "avatar": "img/maximiliano.png", 
-        "voice": "es-ES-AlvaroNeural", "speed": "-5%",
+        "name": "Maximiliano Alcázar", "short_name": "Maximiliano", "avatar": "img/maximiliano.png", 
+        "backup": "https://cdn-icons-png.flaticon.com/512/4086/4086679.png",
+        "voice_id": "syjZiIvIUSwKREBfMpKZ", 
         "greeting": "¿Quién sois? No recibo visitas sin cita previa.",
         "base_instruction": """
             Eres Maximiliano Alcázar del Valle, dueño de la hacienda 'Villa Aurora' en Sevilla. Eres el rochester de la novela Jane eyre adaptado al romanticismo en españa.
@@ -207,8 +209,9 @@ CHARACTERS = {
         """
     },
     "mercedes": {
-        "name": "Doña Mercedes", "short_name": "Doña Mercedes", "role": "Ama de Llaves", "avatar": "img/mercedes.png", 
-        "voice": "es-ES-AbrilNeural", "speed": "+0%",
+        "name": "Doña Mercedes", "short_name": "Doña Mercedes", "avatar": "img/mercedes.png", 
+        "backup": "https://cdn-icons-png.flaticon.com/512/4086/4086577.png",
+        "voice_id": "SbxCN6LQhBInYaeKjhhW", 
         "greeting": "Límpiese los pies. El Señor no está para nadie.",
         "base_instruction": """
             Eres Doña Mercedes (la Señora Martínez), ama de llaves de la finca 'Villa Aurora'.
@@ -221,8 +224,10 @@ CHARACTERS = {
         """
     },
     "elena": {
-        "name": "Elena", "short_name": "Elena", "role": "Espíritu", "avatar": "img/elena.png", 
-        "voice": "es-ES-XimenaNeural", "greeting": "La brisa trae recuerdos de cuando éramos niñas...", "speed": "-20%",
+        "name": "Elena", "short_name": "Elena", "avatar": "img/elena.png", 
+        "backup": "https://cdn-icons-png.flaticon.com/512/4086/4086567.png",
+        "voice_id": "tXgbXPnsMpKXkuTgvE3h", 
+        "greeting": "La brisa trae recuerdos de cuando éramos niñas...",
         "base_instruction": """
             Eres el espíritu o el recuerdo vivo de Elena, la mejor amiga de la infancia de Leonor.
             Falleciste de cólera en el hospicio de San Bernardino cuando eráis niñas, pero sigues viva en la memoria de Leonor.
@@ -234,28 +239,30 @@ CHARACTERS = {
         """
     },
     "susana": {
-        "name": "Susana (Autora)", "short_name": "Susana", "role": "La Autora", "avatar": "img/susana.png", 
-        "voice": "es-ES-ElviraNeural", "speed": "+0%",
+        "name": "Susana (Autora)", "short_name": "Susana", "avatar": "img/susana.png", 
+        "backup": "https://cdn-icons-png.flaticon.com/512/4086/4086652.png",
+        "voice_id": "6GR02MFuGHk4fa0vsd4K", 
         "greeting": "Hola, soy Susana, la autora. Pregúntame sobre cómo creé a Leonor.",
         "base_instruction": """
             Eres Susana, autora de 'El Sueño de Leonor'.
             Tu obra es ficción histórica (S.XIX), saga familiar y empoderamiento femenino.
             Responde de forma cercana y apasionada por la literatura.
             Eres filologa Inglesa, apasionada de la literatura romantica del siglo xix y tus escritoras favoritas son las hermanas bronte
-
         """
     }
 }
 
 # --- 8. NAVEGACIÓN ---
-def ir_a_seleccion(): st.session_state.page = "seleccion"; st.rerun()
+def ir_a_seleccion(): 
+    st.session_state.page = "seleccion"
+    st.session_state.last_audio = None
+    st.rerun()
 def ir_a_chat(p): 
     st.session_state.current_char = p
     st.session_state.page = "chat"
     st.session_state.messages = [{"role": "model", "content": CHARACTERS[p]["greeting"]}]
-    st.session_state.suggested_fragment = None 
+    st.session_state.last_audio = None
     st.rerun()
-def volver(): st.session_state.page = "portada"; st.rerun()
 
 # --- 9. VISTAS ---
 if st.session_state.page == "portada":
@@ -264,150 +271,117 @@ if st.session_state.page == "portada":
     st.markdown("<h3>Una novela de pasión y misterio en el siglo XIX</h3>", unsafe_allow_html=True)
     
     c1, c2, c3 = st.columns([1, 2, 1])
-    
     with c2:
-        try: st.image("img/villa_aurora.png", use_container_width=True)
-        except: st.image("https://placehold.co/600x400/png?text=Villa+Aurora", use_container_width=True)
-        
+        safe_image("img/villa_aurora.png", "https://t4.ftcdn.net/jpg/05/65/59/89/360_F_565598913_wXqYq9jJ9xHq0n0.jpg")
         st.markdown(f'<div class="sinopsis-box">{SINOPSIS_TEXTO}</div>', unsafe_allow_html=True)
-        
         col_a, col_b = st.columns([1, 1])
         with col_a:
-            if st.button("🔊 Escuchar Sinopsis", use_container_width=True):
-                with st.spinner("Leyendo sinopsis..."):
-                    try:
-                        audio_file = asyncio.run(generar_audio_edge(SINOPSIS_TEXTO, "es-ES-ElviraNeural", "+0%"))
-                        if audio_file: st.audio(audio_file, format='audio/mp3', autoplay=True)
-                    except Exception as e: st.error(f"Error: {e}")
+            if st.button("🔊 Escuchar Sinopsis"):
+                with st.spinner("Leyendo..."):
+                    audio = generar_audio(SINOPSIS_TEXTO, CHARACTERS["susana"]["voice_id"])
+                    if audio: 
+                        st.session_state.last_audio = audio
+                        st.rerun()
         with col_b:
-            if st.button("🗝️ ENTRAR EN LA NOVELA", use_container_width=True): ir_a_seleccion()
+            if st.button("🗝️ ENTRAR EN LA NOVELA"): ir_a_seleccion()
+    if st.session_state.last_audio:
+        st.audio(st.session_state.last_audio, format='audio/mp3', autoplay=True)
 
 elif st.session_state.page == "seleccion":
-    # --- MODIFICACIÓN DE DISEÑO: TÍTULO Y AUTORA ENCABEZADO ---
-    # Creamos dos columnas: una ancha para el título y otra estrecha para Susana a la derecha
-    c_header, c_author = st.columns([4, 1])
-    
+    c_header, c_author = st.columns([3, 1])
     with c_header:
         st.title("EL VESTÍBULO")
         st.markdown("<h3>Elige tu interlocutor:</h3>", unsafe_allow_html=True)
-        
     with c_author:
-        # Aquí mostramos a Susana separada, en la esquina
         s_data = CHARACTERS["susana"]
-        try: st.image(s_data["avatar"], width=100) # Imagen más pequeña
-        except: pass
-        if st.button("La Autora", key="susana_btn"): # Botón específico
-            ir_a_chat("susana")
+        safe_image(s_data["avatar"], s_data["backup"], width=100)
+        if st.button("La Autora", key="btn_susana"): ir_a_chat("susana")
 
-    st.markdown("---") # Línea separadora
-
-    # --- GRID DEL RESTO DE PERSONAJES (Excluyendo a Susana) ---
-    personajes_grid = [k for k in CHARACTERS.keys() if k != "susana"]
-    
-    # Fila 1: Primeros 3 personajes
-    row1 = st.columns(3)
-    for i in range(3):
-        if i < len(personajes_grid):
-            k = personajes_grid[i]
-            d = CHARACTERS[k]
-            with row1[i]:
-                try: st.image(d["avatar"], use_container_width=True)
-                except: pass
-                if st.button(d["short_name"], key=k): ir_a_chat(k)
-    
-    # Fila 2: Resto (Si hay más de 3)
-    if len(personajes_grid) > 3:
-        st.markdown("<br>", unsafe_allow_html=True)
-        row2 = st.columns(3) 
-        for i in range(3, len(personajes_grid)):
-            col_idx = i - 3
-            if col_idx < 3:
-                k = personajes_grid[i]
-                d = CHARACTERS[k]
-                with row2[col_idx]:
-                    try: st.image(d["avatar"], use_container_width=True)
-                    except: pass
-                    if st.button(d["short_name"], key=k): ir_a_chat(k)
-
+    st.markdown("---")
+    pjs = [k for k in CHARACTERS.keys() if k != "susana"]
+    cols = st.columns(len(pjs))
+    for i, p in enumerate(pjs):
+        d = CHARACTERS[p]
+        with cols[i]:
+            safe_image(d["avatar"], d["backup"])
+            if st.button(d["short_name"], key=f"btn_{p}"): ir_a_chat(p)
+            
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("⬅️ Volver a la portada"): volver()
+    if st.button("⬅️ Volver"): 
+        st.session_state.page = "portada"
+        st.rerun()
 
 elif st.session_state.page == "chat":
     key = st.session_state.current_char
     data = CHARACTERS[key]
     
-    c1, c2 = st.columns([1, 10])
+    c1, c2 = st.columns([1, 6])
     with c1: 
         if st.button("⬅️"): ir_a_seleccion()
-    with c2: st.subheader(f"{data['name']}")
+    with c2: 
+        st.subheader(f"Conversando con {data['name']}")
 
     for msg in st.session_state.messages:
         role = "assistant" if msg["role"] == "model" else "user"
-        av = data["avatar"] if role == "assistant" else None
-        texto_mostrar = re.sub(r'\[\[REF:\d+\]\]', '', msg["content"])
-        with st.chat_message(role, avatar=av): st.markdown(texto_mostrar)
+        av_icon = data["avatar"] if role == "assistant" else "🧑‍💻"
+        with st.chat_message(role, avatar=av_icon): 
+            st.markdown(re.sub(r'\[\[REF:\d+\]\]', '', msg["content"]))
+
+    if st.session_state.last_audio:
+        st.audio(st.session_state.last_audio, format='audio/mp3', autoplay=False)
 
     if st.session_state.suggested_fragment is not None:
         idx = st.session_state.suggested_fragment
-        fragmentos_pj = LIBRO_FRAGMENTOS.get(key, [])
-        if 0 <= idx < len(fragmentos_pj):
-            frag_text = fragmentos_pj[idx]
-            st.markdown(f"""
-            <div class="cita-sugerida">
-                <div class="cita-titulo">📜 {data['short_name']} sugiere leer:</div>
-                <div class="cita-texto">"{frag_text}"</div>
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button("🔊 Leer fragmento"):
-                 st.session_state.messages.append({"role": "model", "content": f"_(Lee el pasaje)_ {frag_text}"})
-                 st.session_state.suggested_fragment = None 
-                 st.rerun() 
+        frag = LIBRO_FRAGMENTOS.get(key, [])[idx]
+        st.info(f"📜 Sugerencia: {frag}")
+        if st.button("🔊 Leer Fragmento"):
+             st.session_state.messages.append({"role": "model", "content": frag})
+             st.session_state.suggested_fragment = None 
+             with st.spinner("Generando audio..."):
+                audio = generar_audio(frag, data["voice_id"])
+                if audio: st.session_state.last_audio = audio
+             st.rerun()
 
-    prompt_completo = preparar_prompt_inteligente(key, data["base_instruction"])
-    try: model = genai.GenerativeModel("gemini-2.5-flash-preview-09-2025", system_instruction=prompt_completo)
-    except: model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=prompt_completo)
+    def preparar_prompt_inteligente(char_key, base_instruction):
+        fragmentos = LIBRO_FRAGMENTOS.get(char_key, [])
+        texto_fragmentos = ""
+        for i, frag in enumerate(fragmentos):
+            texto_fragmentos += f"FRAGMENTO_{i}: {frag}\n"
+        return f"{base_instruction}\n{PAUTAS_COMUNES}\n--- MEMORIA LITERARIA ---\n{texto_fragmentos}\nSi usas un fragmento, pon [[REF:número]]."
 
-    if prompt := st.chat_input("..."):
+    prompt_sys = preparar_prompt_inteligente(key, data["base_instruction"])
+    try: model = genai.GenerativeModel("gemini-2.5-flash-preview-09-2025", system_instruction=prompt_sys)
+    except: model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=prompt_sys)
+
+    if prompt := st.chat_input("Escribe tu mensaje..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        st.session_state.suggested_fragment = None 
-        with st.chat_message("user"): st.markdown(prompt)
+        with st.chat_message("user", avatar="🧑‍💻"): st.markdown(prompt)
 
         with st.chat_message("assistant", avatar=data["avatar"]):
             box = st.empty()
             full_text = ""
-            history_clean = []
+            hist = [{"role": m["role"], "parts": [re.sub(r'\[\[REF:\d+\]\]', '', m["content"])]} for m in st.session_state.messages]
             
-            for m in st.session_state.messages:
-                clean_content = re.sub(r'\[\[REF:\d+\]\]', '', m["content"])
-                history_clean.append({"role": m["role"], "parts": [clean_content]})
-
             try:
-                chat = model.start_chat(history=history_clean[:-1])
-                response = chat.send_message(prompt, stream=True)
-                
-                for chunk in response:
+                chat = model.start_chat(history=hist[:-1])
+                resp = chat.send_message(prompt, stream=True)
+                for chunk in resp:
                     if chunk.text:
                         full_text += chunk.text
-                        display_text = re.sub(r'\[\[REF:\d+\]\]', '', full_text)
-                        box.markdown(display_text + "▌")
-                        time.sleep(0.01)
+                        box.markdown(re.sub(r'\[\[REF:\d+\]\]', '', full_text) + "▌")
                 
-                final_display = re.sub(r'\[\[REF:\d+\]\]', '', full_text)
-                box.markdown(final_display)
+                final_txt = re.sub(r'\[\[REF:\d+\]\]', '', full_text)
+                box.markdown(final_txt)
                 st.session_state.messages.append({"role": "model", "content": full_text})
                 
-                match = re.search(r'\[\[REF:(\d+)\]\]', full_text)
-                if match:
-                    ref_id = int(match.group(1))
-                    st.session_state.suggested_fragment = ref_id
-                    st.rerun() 
+                if match := re.search(r'\[\[REF:(\d+)\]\]', full_text):
+                    st.session_state.suggested_fragment = int(match.group(1))
 
-                with st.spinner("🔊 ..."):
-                    try:
-                        velocidad = data.get("speed", "-10%")
-                        audio_file = asyncio.run(generar_audio_edge(full_text, data["voice"], velocidad))
-                        if audio_file: st.audio(audio_file, format='audio/mp3', autoplay=True)
-                    except: pass
+                with st.spinner("🔊 Generando voz..."):
+                    audio = generar_audio(final_txt, data["voice_id"])
+                    if audio:
+                        st.session_state.last_audio = audio
+                        st.rerun()
 
             except Exception as e:
                 st.error(f"Error: {e}")
