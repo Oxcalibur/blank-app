@@ -4,3 +4,5 @@ edge-tts
 google-cloud-texttospeech
 requests
 google-auth
+elevenlabs>=1.0.0
+
