@@ -69,7 +69,7 @@ def cargar_novela():
     full_text = ""
     # Intento 1: Leer PDF
     try:
-        reader = pypdf.PdfReader("img/Leonor.pdf")
+        reader = pypdf.PdfReader("img/LEONOR.pdf")
         for page in reader.pages:
             full_text += page.extract_text() + "\n"
         if full_text:
