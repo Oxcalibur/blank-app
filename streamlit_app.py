@@ -1,10 +1,13 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from elevenlabs.client import ElevenLabs
 from elevenlabs import VoiceSettings
 import tempfile
 import re 
 import time
+import random
+import pypdf
 
 # --- 1. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
@@ -19,46 +22,18 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lora:ital@0;1&display=swap');
     
-    /* FONDO Y TEXTOS */
-    .stApp, div[data-testid="stAppViewContainer"] {
-        background-color: #fdfbf7 !important;
-    }
-    
+    .stApp, div[data-testid="stAppViewContainer"] { background-color: #fdfbf7 !important; }
     h1, h2, h3, h4, h5, h6, p, div, span, li, a, label, button, input { 
         color: #4b3621 !important; 
         font-family: 'Lora', serif !important; 
     }
-    
-    /* TÍTULOS */
-    h1 { 
-        font-family: 'Cinzel', serif !important; 
-        text-align: center; 
-        text-transform: uppercase; 
-        text-shadow: 2px 2px 4px #d4c5b0; 
-        margin: 10px 0 !important;
-    }
+    h1 { font-family: 'Cinzel', serif !important; text-align: center; text-transform: uppercase; margin: 10px 0 !important; text-shadow: 2px 2px 4px #d4c5b0; }
     h3 { font-style: italic; text-align: center; }
-    
-    /* BOTONES */
-    .stButton button { 
-        background-color: transparent !important; 
-        border: 2px solid #8b5e3c !important; 
-        border-radius: 10px; 
-        font-weight: bold; 
-        width: 100%;
-    }
-    .stButton button:hover { 
-        background-color: #5e3c38 !important; 
-        transform: scale(1.02); 
-    }
+    .stButton button { background-color: transparent !important; border: 2px solid #8b5e3c !important; border-radius: 10px; font-weight: bold; width: 100%; }
+    .stButton button:hover { background-color: #5e3c38 !important; transform: scale(1.02); }
     .stButton button:hover p { color: #ffffff !important; }
-    
-    /* CHAT Y CAJAS */
     .stChatMessage { background-color: #ffffff !important; border: 1px solid #e0d0c0; border-radius: 15px; }
     .sinopsis-box { background-color: #fffaf0; border: 1px solid #d4c5b0; padding: 20px; border-radius: 8px; font-family: 'Cinzel', serif !important; text-align: justify; margin-bottom: 20px; }
-    .cita-sugerida { background-color: #f4eadd; border-left: 4px solid #8b5e3c; padding: 15px; margin: 15px 0; border-radius: 5px; }
-    
-    /* IMÁGENES */
     div[data-testid="stImage"] { margin: auto; }
 </style>
 """, unsafe_allow_html=True)
@@ -67,18 +42,18 @@ st.markdown("""
 if "page" not in st.session_state: st.session_state.page = "portada"
 if "current_char" not in st.session_state: st.session_state.current_char = None
 if "messages" not in st.session_state: st.session_state.messages = []
-if "suggested_fragment" not in st.session_state: st.session_state.suggested_fragment = None
 if "last_audio" not in st.session_state: st.session_state.last_audio = None
+if "novel_text" not in st.session_state: st.session_state.novel_text = ""
+if "turn_count" not in st.session_state: st.session_state.turn_count = 0
 
 # --- 4. API SETUP ---
+google_api_key = None
 try:
-    api_key = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=api_key)
+    google_api_key = st.secrets["GOOGLE_API_KEY"]
 except:
     st.error("⚠️ Falta GOOGLE_API_KEY en secrets.toml")
     st.stop()
 
-# Configuración ElevenLabs
 eleven_client = None
 if "ELEVENLABS_API_KEY" in st.secrets:
     try:
@@ -86,12 +61,42 @@ if "ELEVENLABS_API_KEY" in st.secrets:
     except Exception as e:
         st.error(f"Error conectando con ElevenLabs: {e}")
 
-# --- 5. TEXTOS Y DATOS ---
+# --- 5. CARGAR NOVELA ---
+def cargar_novela():
+    if st.session_state.novel_text:
+        return st.session_state.novel_text
+
+    full_text = ""
+    # Intento 1: Leer PDF
+    try:
+        reader = pypdf.PdfReader("img/Leonor.pdf")
+        for page in reader.pages:
+            full_text += page.extract_text() + "\n"
+        if full_text:
+            st.session_state.novel_text = full_text
+            return full_text
+    except FileNotFoundError:
+        pass 
+    # Intento 2: Leer TXT
+    try:
+        with open("img/Leonor.txt", "r", encoding="utf-8") as f:
+            full_text = f.read()
+            st.session_state.novel_text = full_text
+            return full_text
+    except FileNotFoundError:
+        return None 
+
+TEXTO_NOVELA = cargar_novela()
+
+# --- 6. TEXTOS ---
 PAUTAS_COMUNES = """
 DIRECTRICES OBLIGATORIAS DE FORMATO Y ESTILO:
 1. BREVEDAD: Tus respuestas deben ser CORTAS y concisas (máximo 2 o 3 oraciones). Estamos en un diálogo fluido.
 2. FORMATO DE VOZ: Estás hablando, no escribiendo. NO uses nunca markdown (ni negritas, ni cursivas). NO uses asteriscos para describir acciones (*suspira*). Solo texto plano.
 3. IDIOMA: Responde siempre en Español de España (Castellano).
+4. CONOCIMIENTO: Tienes acceso al TEXTO COMPLETO de la novela. Úsalo.
+   - Si el usuario pregunta algo específico, busca en tu memoria del texto.
+   - Si viene a cuento, cita una frase breve y literal del libro que refuerce tu argumento.
 """
 
 SINOPSIS_TEXTO = """
@@ -102,77 +107,13 @@ Leonor Polo no es una mujer común. Sobreviviente de una infancia cruel y de un 
 Sin embargo, la sombra de un secreto se cierne sobre la rica hacienda, amenazando con destruirlo todo. Lejos, en el brumoso Londres Victoriano, Leonor se reinventa como librera, forjando su independencia y labrándose un camino por sí misma.
 """
 
-LIBRO_FRAGMENTOS = {
-    "leonor": [
-        "La lectura era mi refugio: iba a la biblioteca del salón verde y cogía libros sin que nadie supiera nada. Nadie se daba cuenta, porque en esa casa el único que leía era tío Juan, y ya no vivía.",
-        "Villa Aurora era mucho más bella de lo que nunca hubiera imaginado; pero también sentía una extraña inquietud ante tanto lujo. Tenía miedo de que fuera un sueño y me despertara en la casa de tía Guadalupe.",
-        "Quería a ese hombre por encima de todo y con toda mi alma. Mi moral victoriana, mis principios férreos… eran solo palabras vacías frente a la fuerza de la realidad. En ese instante, nada más importaba.",
-        "El Sueño de Leonor se convirtió el nombre de mi librería, en español para que resultara más exótico. Era un lugar acogedor con estanterías de madera llenas de libros de todos los tamaños y colores."
-    ],
-    "maximiliano": [
-        "Voy a confiar en usted y solo en usted, en nadie más, para que me ayude en esta misión. Una vez me salvó la vida… Por favor, haga usted lo que le pido; y, sobre todo, sea sumamente discreta.",
-        "¿No se da cuenta de que estoy representando un papel para acercarla más a mí? Los celos son un arma poderosa; y a lo largo de la historia, como usted seguro que ha leído en tantos libros, ha funcionado.",
-        "Soy ciego, manco de una mano, y mucho mayor que usted, y usted es una mujer inteligente, joven e independiente. ¿Se puede saber qué diantres hace con un despojo como yo?",
-        "Como has visto, querida mía, soy como un árbol herido por un rayo; ciego y manco."
-    ],
-    "mercedes": [
-        "¡Bienvenida a Villa Aurora, señorita Leonor! Soy la señora Martínez, el ama de llaves de esta casa. ¡Qué alegría tenerla por fin aquí! Debe estar usted agotada después de un viaje tan largo.",
-        "La cena se sirve a las ocho y media; cualquier cosa que necesite, estoy a su disposición.",
-        "Señorita, ¿Se ha parado a pensar en que ustedes dos son muy diferentes en todos los sentidos? ¿Que el señor Alcázar, además, podría ser su padre, con esos veinte años de diferencia?"
-    ],
-    "elena": [
-        "Tan solo tenía diez años. Tío Juan me acogió cuando madre falleció. Él sí que era un hombre bueno. Me leía cuentos, además me enseñó a leer.",
-        "Desde el ventanuco se divisaba parte de Sierra Morena, o eso creía; quizás estaba soñando con ese manto enorme de terciopelo verde con sus bosques espesos llenos de riachuelos.",
-        "El aire del atardecer me acarició las mejillas. El olor a flores era dulce. Nunca en mi vida, había experimentado una acogida así."
-    ],
-    "susana": [
-        "Escribir sobre Leonor fue como redescubrir la fuerza que todas llevamos dentro. Quería una heroína que no necesitara ser salvada.",
-        "Quise que Villa Aurora fuera un personaje más, con sus luces, sus sombras y ese calor sofocante de Sevilla que lo envuelve todo.",
-        "Jane Eyre siempre fue mi inspiración, pero Leonor tiene su propia voz. Es más pasional, más mediterránea, más nuestra."
-    ]
-}
-
-# --- 6. FUNCIÓN DE AUDIO (ELEVENLABS API v1.0+ CORREGIDA) ---
-def limpiar_para_audio(texto):
-    texto = re.sub(r'\[\[REF:\d+\]\]', '', texto)
-    return re.sub(r'[\*#_`~]', '', texto).strip()
-
-def generar_audio(texto, voice_id):
-    if not eleven_client:
-        st.warning("⚠️ Configura ELEVENLABS_API_KEY para escuchar el audio.")
-        return None
-        
-    try:
-        clean_text = limpiar_para_audio(texto)
-        if not clean_text: return None
-        
-        # Sintaxis ElevenLabs v1.0+
-        audio_generator = eleven_client.text_to_speech.convert(
-            text=clean_text,
-            voice_id=voice_id,
-            model_id="eleven_multilingual_v2", 
-            output_format="mp3_44100_128",
-            voice_settings=VoiceSettings(
-                stability=0.5, 
-                similarity_boost=0.75,
-                style=0.0,
-                use_speaker_boost=True
-            )
-        )
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
-            for chunk in audio_generator:
-                if chunk: fp.write(chunk)
-            return fp.name
-
-    except Exception as e:
-        st.error(f"Error ElevenLabs: {e}")
-        return None
-
-# --- 7. CONFIGURACIÓN DE PERSONAJES (IDs DEFINITIVOS) ---
+# --- 7. FUNCIÓN SAFE_IMAGE (RESTAURADA) ---
 def safe_image(path, url_backup, width=None):
-    try: st.image(path, width=width, use_container_width=(width is None))
-    except: st.image(url_backup, width=width, use_container_width=(width is None))
+    """Muestra una imagen local y si falla usa la URL de backup"""
+    try: 
+        st.image(path, width=width, use_container_width=(width is None))
+    except: 
+        st.image(url_backup, width=width, use_container_width=(width is None))
 
 CHARACTERS = {
     "leonor": {
@@ -252,19 +193,53 @@ CHARACTERS = {
     }
 }
 
-# --- 8. NAVEGACIÓN ---
+# --- 8. FUNCIÓN DE AUDIO ---
+def limpiar_para_audio(texto):
+    return re.sub(r'[\*#_`~]', '', texto).strip()
+
+def generar_audio(texto, voice_id):
+    if not eleven_client:
+        st.warning("⚠️ Configura ELEVENLABS_API_KEY")
+        return None
+    try:
+        clean_text = limpiar_para_audio(texto)
+        if not clean_text: return None
+        
+        audio_generator = eleven_client.text_to_speech.convert(
+            text=clean_text,
+            voice_id=voice_id,
+            model_id="eleven_multilingual_v2", 
+            output_format="mp3_44100_128",
+            voice_settings=VoiceSettings(
+                stability=0.5, 
+                similarity_boost=0.75,
+                style=0.0,
+                use_speaker_boost=True
+            )
+        )
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+            for chunk in audio_generator:
+                if chunk: fp.write(chunk)
+            return fp.name
+    except Exception as e:
+        st.error(f"Error ElevenLabs: {e}")
+        return None
+
+# --- 9. NAVEGACIÓN ---
 def ir_a_seleccion(): 
     st.session_state.page = "seleccion"
     st.session_state.last_audio = None
+    st.session_state.turn_count = 0 
     st.rerun()
 def ir_a_chat(p): 
     st.session_state.current_char = p
     st.session_state.page = "chat"
     st.session_state.messages = [{"role": "model", "content": CHARACTERS[p]["greeting"]}]
     st.session_state.last_audio = None
+    st.session_state.turn_count = 0 
     st.rerun()
 
-# --- 9. VISTAS ---
+# --- 10. VISTAS ---
 if st.session_state.page == "portada":
     st.markdown("<br>", unsafe_allow_html=True)
     st.title("EL SUEÑO DE LEONOR")
@@ -305,7 +280,7 @@ elif st.session_state.page == "seleccion":
         with cols[i]:
             safe_image(d["avatar"], d["backup"])
             if st.button(d["short_name"], key=f"btn_{p}"): ir_a_chat(p)
-            
+    
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("⬅️ Volver"): 
         st.session_state.page = "portada"
@@ -321,67 +296,91 @@ elif st.session_state.page == "chat":
     with c2: 
         st.subheader(f"Conversando con {data['name']}")
 
+    # Mostrar mensajes
     for msg in st.session_state.messages:
         role = "assistant" if msg["role"] == "model" else "user"
         av_icon = data["avatar"] if role == "assistant" else "🧑‍💻"
         with st.chat_message(role, avatar=av_icon): 
-            st.markdown(re.sub(r'\[\[REF:\d+\]\]', '', msg["content"]))
+            st.markdown(msg["content"])
 
     if st.session_state.last_audio:
         st.audio(st.session_state.last_audio, format='audio/mp3', autoplay=False)
 
-    if st.session_state.suggested_fragment is not None:
-        idx = st.session_state.suggested_fragment
-        frag = LIBRO_FRAGMENTOS.get(key, [])[idx]
-        st.info(f"📜 Sugerencia: {frag}")
-        if st.button("🔊 Leer Fragmento"):
-             st.session_state.messages.append({"role": "model", "content": frag})
-             st.session_state.suggested_fragment = None 
-             with st.spinner("Generando audio..."):
-                audio = generar_audio(frag, data["voice_id"])
-                if audio: st.session_state.last_audio = audio
-             st.rerun()
+    # BOTÓN DE FRAGMENTO ALEATORIO
+    if TEXTO_NOVELA:
+        if st.button("🎲 Leer un Fragmento al Azar del Libro"):
+            parrafos = [p for p in TEXTO_NOVELA.split("\n\n") if len(p) > 100]
+            if parrafos:
+                fragmento_random = random.choice(parrafos)
+                texto_modelo = f"Aquí tienes un pasaje de mi historia:\n\n_{fragmento_random}_"
+                st.session_state.messages.append({"role": "model", "content": texto_modelo})
+                
+                with st.spinner("Generando voz del fragmento..."):
+                    audio = generar_audio(texto_modelo, data["voice_id"])
+                    if audio: st.session_state.last_audio = audio
+                st.rerun()
+    else:
+        st.info("💡 Consejo: Sube 'novela.pdf' para habilitar lecturas del libro.")
 
+    # --- LÓGICA DEL PROMPT ---
     def preparar_prompt_inteligente(char_key, base_instruction):
-        fragmentos = LIBRO_FRAGMENTOS.get(char_key, [])
-        texto_fragmentos = ""
-        for i, frag in enumerate(fragmentos):
-            texto_fragmentos += f"FRAGMENTO_{i}: {frag}\n"
-        return f"{base_instruction}\n{PAUTAS_COMUNES}\n--- MEMORIA LITERARIA ---\n{texto_fragmentos}\nSi usas un fragmento, pon [[REF:número]]."
+        contexto_libro = ""
+        if TEXTO_NOVELA:
+            # Recortamos a 800k caracteres para evitar errores de token limit
+            contexto_libro = f"\n\n--- TEXTO COMPLETO DE LA NOVELA (CONTEXTO) ---\n{TEXTO_NOVELA[:800000]}\n------------------------------------------"
+        return f"{base_instruction}\n{PAUTAS_COMUNES}{contexto_libro}"
 
     prompt_sys = preparar_prompt_inteligente(key, data["base_instruction"])
-    try: model = genai.GenerativeModel("gemini-2.5-flash-preview-09-2025", system_instruction=prompt_sys)
-    except: model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=prompt_sys)
+    
+    # Inicializar Cliente Google GenAI (NUEVO SDK)
+    client = genai.Client(api_key=google_api_key)
 
     if prompt := st.chat_input("Escribe tu mensaje..."):
+        st.session_state.turn_count += 1
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user", avatar="🧑‍💻"): st.markdown(prompt)
 
         with st.chat_message("assistant", avatar=data["avatar"]):
             box = st.empty()
             full_text = ""
-            hist = [{"role": m["role"], "parts": [re.sub(r'\[\[REF:\d+\]\]', '', m["content"])]} for m in st.session_state.messages]
             
+            # Historial
+            hist_api = []
+            for m in st.session_state.messages[:-1]:
+                hist_api.append({"role": m["role"], "parts": [m["content"]]})
+
             try:
-                chat = model.start_chat(history=hist[:-1])
-                resp = chat.send_message(prompt, stream=True)
-                for chunk in resp:
+                # CREAR CHAT (NUEVA SINTAXIS)
+                chat = client.chats.create(
+                    model="gemini-1.5-flash",
+                    config=types.GenerateContentConfig(
+                        system_instruction=prompt_sys,
+                        temperature=0.7
+                    ),
+                    history=hist_api
+                )
+
+                prompt_to_model = prompt
+                # Recordatorio periódico para usar fragmentos
+                if st.session_state.turn_count > 0 and st.session_state.turn_count % 3 == 0:
+                    prompt_to_model += " [INSTRUCCIÓN OCULTA: Si viene a cuento, cita brevemente un fragmento literal del libro.]"
+
+                # ENVIAR MENSAJE
+                response_stream = chat.send_message(prompt_to_model, stream=True)
+                
+                for chunk in response_stream:
                     if chunk.text:
                         full_text += chunk.text
-                        box.markdown(re.sub(r'\[\[REF:\d+\]\]', '', full_text) + "▌")
+                        box.markdown(full_text + "▌")
                 
-                final_txt = re.sub(r'\[\[REF:\d+\]\]', '', full_text)
-                box.markdown(final_txt)
+                box.markdown(full_text)
                 st.session_state.messages.append({"role": "model", "content": full_text})
                 
-                if match := re.search(r'\[\[REF:(\d+)\]\]', full_text):
-                    st.session_state.suggested_fragment = int(match.group(1))
-
                 with st.spinner("🔊 Generando voz..."):
-                    audio = generar_audio(final_txt, data["voice_id"])
+                    audio = generar_audio(full_text, data["voice_id"])
                     if audio:
                         st.session_state.last_audio = audio
                         st.rerun()
 
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error Google API: {e}")
