@@ -33,7 +33,6 @@ st.markdown("""
     .stButton button:hover { background-color: #5e3c38 !important; transform: scale(1.02); }
     .stButton button:hover p { color: #ffffff !important; }
     .stChatMessage { background-color: #ffffff !important; border: 1px solid #e0d0c0; border-radius: 15px; }
-    .sinopsis-box { background-color: #fffaf0; border: 1px solid #d4c5b0; padding: 20px; border-radius: 8px; font-family: 'Cinzel', serif !important; text-align: justify; margin-bottom: 20px; }
     div[data-testid="stImage"] { margin: auto; }
 </style>
 """, unsafe_allow_html=True)
@@ -61,34 +60,43 @@ if "ELEVENLABS_API_KEY" in st.secrets:
     except Exception as e:
         st.error(f"Error conectando con ElevenLabs: {e}")
 
-# --- 5. CARGAR NOVELA ---
+# --- 5. CARGAR Y LIMPIAR NOVELA ---
+def limpiar_texto_pdf(texto):
+    """Elimina basura de formato común en conversiones de PDF"""
+    texto = re.sub(r'Con formato:.*', '', texto)
+    texto = re.sub(r'\s+', ' ', texto).strip()
+    return texto
+
 def cargar_novela():
     if st.session_state.novel_text:
         return st.session_state.novel_text
 
     full_text = ""
-    # Intento 1: Leer PDF
+    # Intento 1: Leer PDF en img/
     try:
-        reader = pypdf.PdfReader("img/LEONOR.pdf")
+        reader = pypdf.PdfReader("img/leonor.pdf")
         for page in reader.pages:
             full_text += page.extract_text() + "\n"
         if full_text:
-            st.session_state.novel_text = full_text
-            return full_text
+            clean_text = limpiar_texto_pdf(full_text)
+            st.session_state.novel_text = clean_text
+            return clean_text
     except FileNotFoundError:
         pass 
-    # Intento 2: Leer TXT
+    
+    # Intento 2: Leer TXT en img/
     try:
-        with open("img/Leonor.txt", "r", encoding="utf-8") as f:
+        with open("img/leonor.txt", "r", encoding="utf-8") as f:
             full_text = f.read()
-            st.session_state.novel_text = full_text
-            return full_text
+            clean_text = limpiar_texto_pdf(full_text)
+            st.session_state.novel_text = clean_text
+            return clean_text
     except FileNotFoundError:
         return None 
 
 TEXTO_NOVELA = cargar_novela()
 
-# --- 6. TEXTOS ---
+# --- 6. TEXTOS (PAUTAS GENERALES) ---
 PAUTAS_COMUNES = """
 DIRECTRICES OBLIGATORIAS DE FORMATO Y ESTILO:
 1. BREVEDAD: Tus respuestas deben ser CORTAS y concisas (máximo 2 o 3 oraciones). Estamos en un diálogo fluido.
@@ -107,14 +115,11 @@ Leonor Polo no es una mujer común. Sobreviviente de una infancia cruel y de un 
 Sin embargo, la sombra de un secreto se cierne sobre la rica hacienda, amenazando con destruirlo todo. Lejos, en el brumoso Londres Victoriano, Leonor se reinventa como librera, forjando su independencia y labrándose un camino por sí misma.
 """
 
-# --- 7. FUNCIÓN SAFE_IMAGE (RESTAURADA) ---
 def safe_image(path, url_backup, width=None):
-    """Muestra una imagen local y si falla usa la URL de backup"""
-    try: 
-        st.image(path, width=width, use_container_width=(width is None))
-    except: 
-        st.image(url_backup, width=width, use_container_width=(width is None))
+    try: st.image(path, width=width, use_container_width=(width is None))
+    except: st.image(url_backup, width=width, use_container_width=(width is None))
 
+# --- 7. PERSONAJES (INSTRUCCIONES DETALLADAS RESTAURADAS) ---
 CHARACTERS = {
     "leonor": {
         "name": "Leonor Polo", "short_name": "Leonor", "avatar": "img/leonor.png", 
@@ -210,12 +215,7 @@ def generar_audio(texto, voice_id):
             voice_id=voice_id,
             model_id="eleven_multilingual_v2", 
             output_format="mp3_44100_128",
-            voice_settings=VoiceSettings(
-                stability=0.5, 
-                similarity_boost=0.75,
-                style=0.0,
-                use_speaker_boost=True
-            )
+            voice_settings=VoiceSettings(stability=0.5, similarity_boost=0.75, style=0.0, use_speaker_boost=True)
         )
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
             for chunk in audio_generator:
@@ -225,7 +225,33 @@ def generar_audio(texto, voice_id):
         st.error(f"Error ElevenLabs: {e}")
         return None
 
-# --- 9. NAVEGACIÓN ---
+# --- 9. EXTRACCIÓN INTELIGENTE DE FRAGMENTOS (SOLUCIÓN FRASES LARGAS) ---
+def obtener_fragmento_inteligente(texto_completo):
+    """
+    Extrae un fragmento de tamaño controlado (aprox 400-600 caracteres)
+    evitando cortar frases a la mitad.
+    """
+    largo = len(texto_completo)
+    if largo < 500: return texto_completo 
+    
+    # Elegir punto aleatorio
+    inicio_azar = random.randint(0, largo - 800)
+    
+    # Buscar el primer punto "." después para empezar limpio
+    inicio_frase = texto_completo.find('.', inicio_azar) + 1
+    if inicio_frase == 0: inicio_frase = inicio_azar
+
+    # Coger bloque de 600 caracteres
+    bloque = texto_completo[inicio_frase : inicio_frase + 600]
+    
+    # Cortar en el último punto
+    ultimo_punto = bloque.rfind('.')
+    if ultimo_punto != -1:
+        bloque = bloque[:ultimo_punto + 1]
+        
+    return bloque.strip()
+
+# --- 10. NAVEGACIÓN ---
 def ir_a_seleccion(): 
     st.session_state.page = "seleccion"
     st.session_state.last_audio = None
@@ -239,7 +265,7 @@ def ir_a_chat(p):
     st.session_state.turn_count = 0 
     st.rerun()
 
-# --- 10. VISTAS ---
+# --- 11. VISTAS ---
 if st.session_state.page == "portada":
     st.markdown("<br>", unsafe_allow_html=True)
     st.title("EL SUEÑO DE LEONOR")
@@ -296,7 +322,6 @@ elif st.session_state.page == "chat":
     with c2: 
         st.subheader(f"Conversando con {data['name']}")
 
-    # Mostrar mensajes
     for msg in st.session_state.messages:
         role = "assistant" if msg["role"] == "model" else "user"
         av_icon = data["avatar"] if role == "assistant" else "🧑‍💻"
@@ -306,33 +331,29 @@ elif st.session_state.page == "chat":
     if st.session_state.last_audio:
         st.audio(st.session_state.last_audio, format='audio/mp3', autoplay=False)
 
-    # BOTÓN DE FRAGMENTO ALEATORIO
+    # BOTÓN DE FRAGMENTO ALEATORIO (LÓGICA NUEVA)
     if TEXTO_NOVELA:
         if st.button("🎲 Leer un Fragmento al Azar del Libro"):
-            parrafos = [p for p in TEXTO_NOVELA.split("\n\n") if len(p) > 100]
-            if parrafos:
-                fragmento_random = random.choice(parrafos)
-                texto_modelo = f"Aquí tienes un pasaje de mi historia:\n\n_{fragmento_random}_"
-                st.session_state.messages.append({"role": "model", "content": texto_modelo})
-                
-                with st.spinner("Generando voz del fragmento..."):
-                    audio = generar_audio(texto_modelo, data["voice_id"])
-                    if audio: st.session_state.last_audio = audio
-                st.rerun()
+            fragmento_random = obtener_fragmento_inteligente(TEXTO_NOVELA)
+            texto_modelo = f"Aquí tienes un pasaje de mi historia:\n\n_...{fragmento_random}..._"
+            st.session_state.messages.append({"role": "model", "content": texto_modelo})
+            
+            with st.spinner("Generando voz del fragmento..."):
+                audio = generar_audio(texto_modelo, data["voice_id"])
+                if audio: st.session_state.last_audio = audio
+            st.rerun()
     else:
-        st.info("💡 Consejo: Sube 'novela.pdf' para habilitar lecturas del libro.")
+        st.info("💡 Consejo: Sube 'img/leonor.pdf' para habilitar lecturas.")
 
     # --- LÓGICA DEL PROMPT ---
     def preparar_prompt_inteligente(char_key, base_instruction):
         contexto_libro = ""
         if TEXTO_NOVELA:
-            # Recortamos a 800k caracteres para evitar errores de token limit
-            contexto_libro = f"\n\n--- TEXTO COMPLETO DE LA NOVELA (CONTEXTO) ---\n{TEXTO_NOVELA[:800000]}\n------------------------------------------"
+            # Recortamos a 800k caracteres por seguridad
+            contexto_libro = f"\n\n--- TEXTO COMPLETO DE LA NOVELA (USO INTERNO SOLO) ---\n{TEXTO_NOVELA[:800000]}\n------------------------------------------"
         return f"{base_instruction}\n{PAUTAS_COMUNES}{contexto_libro}"
 
     prompt_sys = preparar_prompt_inteligente(key, data["base_instruction"])
-    
-    # Inicializar Cliente Google GenAI (NUEVO SDK)
     client = genai.Client(api_key=google_api_key)
 
     if prompt := st.chat_input("Escribe tu mensaje..."):
@@ -344,13 +365,11 @@ elif st.session_state.page == "chat":
             box = st.empty()
             full_text = ""
             
-            # Historial
             hist_api = []
             for m in st.session_state.messages[:-1]:
-                hist_api.append({"role": m["role"], "parts": [m["content"]]})
+                hist_api.append({"role": m["role"], "parts": [{"text": m["content"]}]})
 
             try:
-                # CREAR CHAT (NUEVA SINTAXIS)
                 chat = client.chats.create(
                     model="gemini-1.5-flash",
                     config=types.GenerateContentConfig(
@@ -361,11 +380,9 @@ elif st.session_state.page == "chat":
                 )
 
                 prompt_to_model = prompt
-                # Recordatorio periódico para usar fragmentos
-                if st.session_state.turn_count > 0 and st.session_state.turn_count % 3 == 0:
-                    prompt_to_model += " [INSTRUCCIÓN OCULTA: Si viene a cuento, cita brevemente un fragmento literal del libro.]"
+                if st.session_state.turn_count > 0:
+                    prompt_to_model += " [IMPORTANTE: Responde en menos de 50 palabras. NO cites el libro entero.]"
 
-                # ENVIAR MENSAJE
                 response_stream = chat.send_message(prompt_to_model, stream=True)
                 
                 for chunk in response_stream:
