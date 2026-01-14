@@ -43,6 +43,16 @@ if st.session_state.page in ["seleccion", "chat"]:
         </style>
         """, unsafe_allow_html=True)
 
+# --- CONTROL DE MÚSICA (TOP RIGHT) ---
+if "mute_music" not in st.session_state: st.session_state.mute_music = False
+
+c_spacer, c_music = st.columns([11, 1])
+with c_music:
+    icon_music = "🔇" if st.session_state.mute_music else "🔊"
+    if st.button(icon_music, key="btn_music_toggle", help="Activar/Desactivar Música"):
+        st.session_state.mute_music = not st.session_state.mute_music
+        st.rerun()
+
 client_text, client_audio = init_api_keys()
 novel_text = cargar_novela()
 
@@ -53,7 +63,6 @@ if "last_audio" not in st.session_state: st.session_state.last_audio = None
 
 with st.sidebar:
     st.markdown("<h2 style='text-align: center;'>Villa Aurora</h2>", unsafe_allow_html=True)
-    st.checkbox("🔇 Silenciar Música", key="mute_music")
     st.divider()
     # Barra lateral optimizada con Fragmentos
     render_sidebar_ia(client_text, novel_text)
