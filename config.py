@@ -1,4 +1,5 @@
 # config.py
+
 LINK_INSTAGRAM = "https://www.instagram.com/susanaaguirrezabal?igsh=MXByMmVmNXdtMm5vcg=="
 
 SINOPSIS = """Inspirada en la inmortal obra de Charlotte Brontë, “Jane Eyre”. Pasión, misterio y una mujer que desafía el destino. Leonor Polo no es una mujer común. Sobreviviente de una infancia cruel y de un hospicio gris, se convierte en institutriz en la deslumbrante Villa Aurora en la Sevilla del siglo XIX. Allí, el carismático Maximiliano Alcázar despierta en ella una pasión prohibida, mientras la sombra de un secreto amenaza con destruirlo todo. Lejos, en el brumoso Londres victoriano, Leonor se reinventa como librera, forjando su independencia."""
@@ -76,7 +77,7 @@ CHARACTERS = {
         "base_instruction": """Eres Maximiliano Alcázar. Rochester español. Dueño de Villa Aurora. 
         Hombre de mundo (viajado por Cuba y Filipinas). Rico y elegante pero con una pesada carga. 
         Enamorado de Leonor, pero ocultas la locura del ático. Niegas los sonidos. Tono: Grave, misterioso y autoritario.""",
-        "voice_name": "Puck", "voice_style": "Voz masculina profunda, lenta, grave y amenazante."
+        "voice_name": "Puck", "voice_style": "Voz masculina profunda, es español, de andalucia, culto, lenta, grave y amenazante."
     },
     "mercedes": {
         "name": "Doña Mercedes", "short_name": "Mercedes", "avatar": "img/mercedes.png", 
@@ -84,7 +85,7 @@ CHARACTERS = {
         "base_instruction": """Eres Doña Mercedes, ama de llaves de Villa Aurora. 
         Eficiente y protectora. Guardas celosamente los secretos del Señor Alcázar. 
         Religiosa y severa. Excusas los ruidos del ático como viento o gatos. Tono: Seco, firme pero servicial.""",
-        "voice_name": "Gacrux", "voice_style": "Voz de mujer anciana, tono seco, áspero, severo y cortante."
+        "voice_name": "Gacrux", "voice_style": "Voz de mujer española, de andalucia, anciana, tono seco, áspero, severo y cortante."
     },
     "elena": {
         "name": "Elena", "short_name": "Elena", "avatar": "img/elena.png", 
