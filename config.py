@@ -7,7 +7,7 @@ SINOPSIS = """Inspirada en la inmortal obra de Charlotte Brontë, “Jane Eyre�
 # --- DISEÑO INMERSIVO V2.0 (GÓTICO ROMÁNTICO) ---
 CSS_STYLE = """
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Crimson+Text:wght@400;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Crimson+Text:wght@400;600&display=swap');
 
     /* 1. FONDO GENERAL Y COLOR (Modo Oscuro Elegante) */
     .stApp {
@@ -95,7 +95,11 @@ CSS_STYLE = """
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {background-color: transparent !important;}
-    [data-testid="stSidebarCollapsedControl"] {color: #d4af37 !important;}
+    [data-testid="stSidebarCollapsedControl"] {
+        color: #d4af37 !important;
+        background-color: rgba(14, 17, 23, 0.2); /* Fondo sutil para contraste */
+        z-index: 999999 !important; /* Siempre visible */
+    }
     
     /* Estilo para las alertas (st.info) */
     div[data-testid="stAlert"] {
@@ -108,6 +112,113 @@ CSS_STYLE = """
         .block-container { padding-top: 2rem !important; }
         h1 { font-size: 1.6rem !important; border: none; }
         .stButton button { width: 100% !important; margin-bottom: 5px; }
+    }
+
+    /* --- TARJETA DE PERSONAJE (FLIP CARD) --- */
+    .contenedor-personaje {
+        perspective: 1000px;
+        background-color: transparent;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        margin-bottom: 10px;
+    }
+
+    .tarjeta {
+        position: relative;
+        width: 200px;  /* Ajustado para columnas de Streamlit */
+        height: 280px;
+        text-align: center;
+        transition: transform 0.8s;
+        transform-style: preserve-3d;
+        pointer-events: none; /* CLAVE: La tarjeta no captura clics, pasan al botón invisible */
+    }
+
+    /* FLIP TRIGGER: Hovering the COLUMN triggers the flip (fixes conflict with invisible button) */
+    [data-testid="stColumn"]:hover .tarjeta {
+        transform: rotateY(180deg);
+    }
+
+    .cara-frontal, .cara-trasera {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* ESTILO FRONTAL */
+    .cara-frontal {
+        background: #1a1a1a;
+        border: 2px solid #d4af37;
+    }
+
+    .marco-imagen {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        border: 3px double #d4af37;
+        overflow: hidden;
+        margin-bottom: 15px;
+        box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        /* Fix for image overflow in some browsers */
+        transform: translateZ(0); 
+    }
+
+    .marco-imagen img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0.9;
+    }
+
+    .nombre-personaje {
+        font-family: 'Cinzel', serif;
+        color: #d4af37;
+        font-size: 20px;
+        margin-top: 10px;
+        text-shadow: 1px 1px 2px black;
+    }
+
+    /* ESTILO TRASERO */
+    .cara-trasera {
+        background-color: #f4e4bc;
+        color: #2c2c2c !important; /* Forzamos color oscuro en el papel */
+        transform: rotateY(180deg);
+        border: 2px solid #d4af37;
+        padding: 15px;
+        font-family: 'Crimson Text', serif;
+    }
+    
+    .cara-trasera div { color: #2c2c2c !important; } /* Asegurar contraste */
+
+    .titulo-trasero {
+        font-family: 'Cinzel', serif;
+        font-weight: bold;
+        color: #5a4a42 !important;
+        border-bottom: 1px solid #d4af37;
+        margin-bottom: 10px;
+        padding-bottom: 5px;
+    }
+    
+    .texto-descripcion {
+        font-size: 14px;
+        font-style: italic;
+        line-height: 1.3;
+    }
+    
+    .alias {
+        margin-top: 15px;
+        font-size: 10px;
+        color: #555 !important;
+        text-transform: uppercase;
+        letter-spacing: 2px;
     }
 </style>
 """
@@ -124,7 +235,9 @@ CHARACTERS = {
         3. Elena: Tu amiga de la infancia muerta, tu conciencia.
         PERSONALIDAD: Culta, lectora de Byron, valiente, independiente y pasional bajo una apariencia tranquila.""",
         "voice_name": "Leda", 
-        "voice_style": "Voz joven (20 años), dulce y cristalina, con matiz de miedo contenido."
+        "voice_style": "Voz joven (20 años), dulce y cristalina, con matiz de miedo contenido.",
+        "role": "La Institutriz",
+        "description": "Una mujer que desafía al destino. De un hospicio gris a la deslumbrante Villa Aurora."
     },
     "maximiliano": {
         "name": "Maximiliano Alcázar", "short_name": "Maximiliano", "avatar": "img/maximiliano.png", 
@@ -136,7 +249,9 @@ CHARACTERS = {
         SECRETO: Ocultas a tu esposa loca en el ático.
         PERSONALIDAD: Grave, cínico, hombre de mundo, autoritario pero vulnerable ante Leonor.""",
         "voice_name": "Puck", 
-        "voice_style": "Voz masculina profunda, acento español de andalucia, culto, lenta, grave y amenazante."
+        "voice_style": "Voz masculina profunda, acento español de andalucia, culto, lenta, grave y amenazante.",
+        "role": "El Patrón",
+        "description": "Dueño de Villa Aurora. Un hombre atormentado por secretos y sombras."
     },
     "mercedes": {
         "name": "Doña Mercedes", "short_name": "Mercedes", "avatar": "img/mercedes.png", 
@@ -147,7 +262,9 @@ CHARACTERS = {
         2. Leonor Polo: La tratas con sequedad y distancia para mantener el orden.
         PERSONALIDAD: Religiosa, severa, eficiente, supersticiosa.""",
         "voice_name": "Gacrux", 
-        "voice_style": "Voz de mujer anciana, acento español de andalucia, tono seco, áspero, severo y cortante."
+        "voice_style": "Voz de mujer anciana, acento español de andalucia, tono seco, áspero, severo y cortante.",
+        "role": "El Ama de Llaves",
+        "description": "Fiel guardiana del orden y de los pecados inconfesables de la casa."
     },
     "elena": {
         "name": "Elena", "short_name": "Elena", "avatar": "img/elena.png", 
@@ -157,7 +274,9 @@ CHARACTERS = {
         CONTEXTO: Solo vives en la mente de Leonor.
         PERSONALIDAD: Dulce, etérea, onírica, inocente y llena de luz.""",
         "voice_name": "Kore", 
-        "voice_style": "Voz etérea, muy suave, casi susurrando. Tono nostálgico y triste."
+        "voice_style": "Voz etérea, muy suave, casi susurrando. Tono nostálgico y triste.",
+        "role": "El Recuerdo",
+        "description": "La amiga perdida. Una voz que susurra desde el pasado y guía tu conciencia."
     },
     "susana": {
         "name": "Susana (Autora)", "short_name": "Susana", "avatar": "img/susana.png", 
@@ -171,6 +290,8 @@ CHARACTERS = {
         Me acabo de atrever con la literatura infantil "la ardilla Suagui cuida del Retiro", una ardilla que nos enseña a mimar a nuestra casa, llamada planeta Tierra. Es un cuento bilingüe inglés-español, coeditado con mi amiga Susana Aguilera, que ya ilustró mi novela anterior. Esperemos que os guste porque sé que los niños sois el público más exigente pero también el más bonito...
         PERSONALIDAD: Amable, apasionada por la literatura victoriana.""",
         "voice_name": "Callirrhoe", 
-        "voice_style": "Voz de locutora profesional, española, culta. Tono neutro y claro."
+        "voice_style": "Voz de locutora profesional, española, culta. Tono neutro y claro.",
+        "role": "La Autora",
+        "description": "La pluma que teje el destino. Pregúntale sobre el proceso creativo."
     }
 }

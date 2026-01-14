@@ -41,6 +41,13 @@ def cargar_novela(path="img/leonor.pdf"):
         return "Texto no disponible."
     return ""
 
+def get_img_as_base64(path):
+    """Convierte una imagen local a string Base64 para incrustar en HTML."""
+    if not os.path.exists(path): return ""
+    with open(path, "rb") as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
 def reproducir_musica_fondo(path="img/Entre mis recuerdos.mp3"):
     """Reproduce música si no está silenciada."""
     if st.session_state.get("mute_music", False): return
@@ -49,10 +56,13 @@ def reproducir_musica_fondo(path="img/Entre mis recuerdos.mp3"):
             with open(path, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode()
             md = f"""
-                <audio autoplay loop id="bg_audio">
+                <audio autoplay loop id="bg_audio" allow="autoplay">
                 <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
                 </audio>
-                <script>document.getElementById("bg_audio").volume = 0.2;</script>
+                <script>
+                    var audio = document.getElementById("bg_audio");
+                    if (audio) {{ audio.volume = 0.2; audio.play().catch(e => console.log("Autoplay bloqueado por navegador")); }}
+                </script>
                 """
             st.markdown(md, unsafe_allow_html=True)
     except: pass
