@@ -9,7 +9,7 @@ from llm_engine import generar_respuesta_chat_stream, generar_recuerdo_personaje
 from game_engine import render_sidebar_ia
 
 # CONFIGURACIÓN RESPONSIVE: 'auto' cierra la barra en móvil y la abre en PC
-st.set_page_config(page_title="El Sueño de Leonor", page_icon="🌹", layout="wide", initial_sidebar_state="auto")
+st.set_page_config(page_title="El Sueño de Leonor", page_icon="🌹", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(CSS_STYLE, unsafe_allow_html=True)
 
 client_text, client_audio = init_api_keys()
@@ -23,10 +23,12 @@ if "last_audio" not in st.session_state: st.session_state.last_audio = None
 with st.sidebar:
     st.markdown("<h2 style='text-align: center;'>Villa Aurora</h2>", unsafe_allow_html=True)
     st.checkbox("🔇 Silenciar Música", key="mute_music")
-    reproducir_musica_fondo()
     st.divider()
     # Barra lateral optimizada con Fragmentos
     render_sidebar_ia(client_text, novel_text)
+
+# Música de fondo (fuera del sidebar para asegurar autoplay al inicio)
+reproducir_musica_fondo()
 
 # --- PORTADA ---
 if st.session_state.page == "portada":
@@ -34,7 +36,7 @@ if st.session_state.page == "portada":
     
     c1, c2, c3 = st.columns([1, 6, 1])
     with c2:
-        st.image("img/villa_aurora.png", use_container_width=True)
+        st.image("img/villa_aurora.png", width="stretch")
         
         st.markdown(f"""
         <div class="info-box" style="margin-top: 20px;">
@@ -45,17 +47,18 @@ if st.session_state.page == "portada":
         
         col_audio, col_entrar = st.columns(2, gap="medium")
         with col_audio:
-            if st.button("🔊 Escuchar Prólogo", use_container_width=True):
+            if st.button("🔊 Escuchar Prólogo", width="stretch"):
                 audio = generar_audio_saludo_cached(client_audio, SINOPSIS, "susana")
                 if audio: st.session_state.last_audio = audio; st.rerun()
         with col_entrar:
-            if st.button("🗝️ ENTRAR EN LA VILLA", use_container_width=True):
+            if st.button("🗝️ ENTRAR EN LA VILLA", width="stretch"):
                 st.session_state.last_audio = None 
                 st.session_state.page = "seleccion"
                 st.rerun()
         
         st.markdown("---")
         st.info("👈 **Tip:** Abre el menú lateral (arriba izq.) para descubrir secretos y jugar.")
+        st.info("👈 **Tip:** Pulsa la flecha (>) arriba a la izquierda para abrir el **Salón de Juegos**.")
             
     if st.session_state.last_audio: 
         st.audio(st.session_state.last_audio, format="audio/wav", autoplay=True)
@@ -67,9 +70,9 @@ elif st.session_state.page == "seleccion":
     _, col_autora = st.columns([6, 1])
     with col_autora:
         if 'susana' in CHARACTERS:
-            try: st.image(CHARACTERS['susana']['avatar'], width=80)
+            try: st.image(CHARACTERS['susana']['avatar'], width="stretch")
             except: pass
-            if st.button("Autora", key="btn_susana"):
+            if st.button("Autora", key="btn_susana", width="stretch"):
                 st.session_state.last_audio = None
                 st.session_state.current_char = "susana"
                 st.session_state.page = "chat"
@@ -84,9 +87,9 @@ elif st.session_state.page == "seleccion":
     for i, key in enumerate(pjs):
         with cols[i]:
             if key in CHARACTERS:
-                try: st.image(CHARACTERS[key]['avatar'], use_container_width=True)
+                try: st.image(CHARACTERS[key]['avatar'], width="stretch")
                 except: pass
-                if st.button(CHARACTERS[key]['short_name'], key=f"btn_{key}"):
+                if st.button(CHARACTERS[key]['short_name'], key=f"btn_{key}", width="stretch"):
                     st.session_state.last_audio = None
                     st.session_state.current_char = key
                     st.session_state.page = "chat"

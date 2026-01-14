@@ -7,106 +7,101 @@ SINOPSIS = """Inspirada en la inmortal obra de Charlotte Brontë, “Jane Eyre�
 # --- DISEÑO INMERSIVO V2.0 (GÓTICO ROMÁNTICO) ---
 CSS_STYLE = """
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lora:ital@0;1&family=Playfair+Display:ital@0;1&display=swap');
-    
-    /* 1. FONDO (Efecto Papel Antiguo) */
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Crimson+Text:wght@400;600&display=swap');
+
+    /* 1. FONDO GENERAL Y COLOR (Modo Oscuro Elegante) */
     .stApp {
-        background-color: #f4eadd;
-        background-image: 
-            linear-gradient(rgba(244, 234, 221, 0.9), rgba(244, 234, 221, 0.9)),
-            url("https://www.transparenttextures.com/patterns/aged-paper.png");
-        background-size: cover;
+        background-color: #0e1117; /* Azul noche muy oscuro */
+        color: #e0e0e0; /* Blanco hueso */
+        font-family: 'Crimson Text', serif;
     }
 
     /* 2. TIPOGRAFÍA */
-    html, body, [class*="css"] { font-family: 'Lora', serif; color: #2c1e12; }
-    
-    /* Forzar contraste alto en elementos de texto comunes para evitar problemas con temas oscuros */
-    .stMarkdown p, .stMarkdown li, .stText, label, .stDataFrame, .stCaption, .stAlert, .stRadio p, .stCheckbox p, .stTabs [data-baseweb="tab-list"] p {
-        color: #2c1e12 !important;
-    }
-    
-    h1, h2, h3, h4, h5, h6 { color: #4b3621 !important; }
-    
-    h1, h2 { 
-        font-family: 'Cinzel', serif !important; 
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Playfair Display', serif !important;
+        color: #d4af37 !important; /* Dorado apagado */
+        text-align: center;
         text-transform: uppercase;
         letter-spacing: 1px;
     }
-    h3 { font-family: 'Playfair Display', serif !important; font-style: italic; color: #5e3c38 !important; }
-
-    /* 3. BOTONES (Estilo Etiqueta Victoriana) */
-    button[kind="secondary"], button[kind="primary"], .stButton button {
-        background-color: transparent !important;
-        color: #5e3c38 !important;
-        border: 1px double #5e3c38 !important;
-        border-radius: 4px !important;
-        font-family: 'Cinzel', serif !important;
-        font-weight: 600 !important;
-        transition: all 0.3s ease;
+    
+    /* Textos generales */
+    p, li, label, .stMarkdown, .stText, .stCaption, .stRadio p, .stAlert p {
+        color: #e0e0e0 !important;
+        font-family: 'Crimson Text', serif;
+        font-size: 1.1rem;
     }
-    button:hover, .stButton button:hover {
-        background-color: #5e3c38 !important;
-        color: #fffaf0 !important;
+
+    /* 3. BOTONES (Estilo Minimalista Dorado) */
+    .stButton > button {
+        background-color: transparent !important;
+        color: #d4af37 !important;
+        border: 1px solid #d4af37 !important;
+        font-family: 'Playfair Display', serif !important;
+        border-radius: 5px !important;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+    }
+    .stButton > button:hover {
+        background-color: #d4af37 !important;
+        color: #0e1117 !important;
+        box-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
         transform: scale(1.02);
     }
 
-    /* 4. CONTENEDORES DE TEXTO (Estilo Carta) */
+    /* 4. CONTENEDORES DE TEXTO */
     .info-box {
-        background-color: #fffbf0;
-        border: 1px solid #d4c5b0;
-        border-left: 4px solid #8b5e3c;
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid #d4af37;
+        border-left: 4px solid #d4af37;
         padding: 20px;
-        border-radius: 2px;
-        box-shadow: 3px 3px 10px rgba(0,0,0,0.05);
-        font-family: 'Lora', serif;
-        color: #2c1e12 !important;
+        border-radius: 5px;
+        color: #e0e0e0 !important;
     }
 
     /* 5. IMÁGENES INTELIGENTES */
-    /* Regla General (Para Villa Aurora - Cuadrada con marco) */
     img {
-        border: 4px solid #fffbf0 !important;
-        outline: 1px solid #d4c5b0;
-        box-shadow: 5px 5px 15px rgba(0,0,0,0.2) !important;
-        border-radius: 2px !important;
+        border: 1px solid #d4af37 !important;
         transition: transform 0.3s;
+        box-shadow: 0 0 10px rgba(0,0,0,0.5);
     }
-    img:hover { transform: scale(1.01); }
+    img:hover { transform: scale(1.02); box-shadow: 0 0 20px rgba(212, 175, 55, 0.4); }
 
-    /* Regla Específica (Para Avatares - Redondos tipo Camafeo) */
-    [data-testid="stSidebar"] img, 
+    /* Avatares circulares en columnas */
     [data-testid="stColumn"] img {
         border-radius: 50% !important;
         aspect-ratio: 1 / 1;
         object-fit: cover;
-        border: 2px solid #8b5e3c !important;
-        padding: 2px !important;
     }
 
     /* 6. CHAT Y SIDEBAR */
-    [data-testid="stSidebar"] { background-color: #e6dace !important; border-right: 1px solid #c0a080; }
+    [data-testid="stSidebar"] { background-color: #0e1117 !important; border-right: 1px solid #333; }
     
     div[data-testid="stChatMessage"] { background-color: transparent !important; border: none !important; }
     div[data-testid="stChatMessage"]:has(div[aria-label="assistant"]) {
-        background-color: #fffbf0 !important;
-        border-left: 3px solid #5e3c38 !important;
+        background-color: rgba(212, 175, 55, 0.1) !important;
+        border-left: 2px solid #d4af37 !important;
         padding: 15px; border-radius: 5px;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
     }
     
     .stChatInput textarea { 
-        background-color: #fffbf0 !important; 
-        border: 2px solid #8b5e3c !important;
-        color: #2c1e12 !important;
-        caret-color: #2c1e12 !important;
+        background-color: #1e212b !important; 
+        border: 1px solid #d4af37 !important;
+        color: #e0e0e0 !important;
+        caret-color: #d4af37 !important;
     }
     
-    /* Elementos extra que suelen salir blancos en modo oscuro */
-    [data-testid="stExpander"] summary { color: #4b3621 !important; }
-    [data-testid="stToast"] { background-color: #fffbf0 !important; color: #2c1e12 !important; }
-    div[role="alert"] { color: #2c1e12 !important; }
+    /* Ocultar elementos molestos de Streamlit */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {background-color: transparent !important;}
+    [data-testid="stSidebarCollapsedControl"] {color: #d4af37 !important;}
+    
+    /* Estilo para las alertas (st.info) */
+    div[data-testid="stAlert"] {
+        background-color: rgba(212, 175, 55, 0.1) !important;
+        border: 1px solid #d4af37 !important;
+    }
 
     /* MÓVIL */
     @media only screen and (max-width: 768px) {
