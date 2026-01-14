@@ -13,6 +13,7 @@ def _get_sys_instruction(personaje_data, contexto_libro):
     """Helper para no repetir código de instrucciones."""
     return f"""
     {personaje_data['base_instruction']}
+    DIRECTRIZ DE LONGITUD: Tus respuestas deben ser breves y conversacionales (máximo 50 palabras) para mantener un diálogo fluido con el lector.
     RESUMEN GENERAL: {SINOPSIS}
     CONTENIDO ÍNTEGRO DE LA NOVELA:
     {contexto_libro}
