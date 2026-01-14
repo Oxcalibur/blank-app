@@ -140,7 +140,9 @@ def generar_pregunta_trivial(client, contexto_libro):
     return {"pregunta": "¿En qué ciudad transcurre la trama?", "opciones": ["Madrid", "Sevilla", "Londres"], "correcta": "Sevilla"}
 
 def generar_curiosidad(client):
-    prompt = "Dato real sorprendente de 1870 o Romanticismo. Máximo 25 palabras."
+    temas = ["moda victoriana", "medicina del siglo XIX", "etiqueta social", "inventos de la revolución industrial", "supersticiones", "literatura romántica", "vida en Londres vs Sevilla", "el lenguaje de los abanicos", "duelos de honor"]
+    tema = random.choice(temas)
+    prompt = f"Dato real curioso y poco conocido sobre {tema} durante el romanticismo (1870). Máximo 25 palabras. Varía la respuesta cada vez."
     for model in [PRIMARY_MODEL, FALLBACK_MODEL]:
         try:
             res = client.models.generate_content(model=model, contents=prompt)
