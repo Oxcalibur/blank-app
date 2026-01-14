@@ -12,6 +12,37 @@ from game_engine import render_sidebar_ia
 st.set_page_config(page_title="El Sueño de Leonor", page_icon="🌹", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(CSS_STYLE, unsafe_allow_html=True)
 
+# --- OPTIMIZACIÓN VISUAL: CARGA DE FONDO INMEDIATA ---
+# Inicializamos la página antes de nada para saber qué fondo cargar
+if "page" not in st.session_state: st.session_state.page = "portada"
+
+# Inyectamos el CSS del fondo AQUÍ (al principio) para evitar el pantallazo negro
+if st.session_state.page in ["seleccion", "chat"]:
+    vestibulo_b64 = get_img_as_base64("img/vestibulo.png")
+    if vestibulo_b64:
+        st.markdown(f"""
+        <style>
+        .stApp {{
+            background-image: url("data:image/png;base64,{vestibulo_b64}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            transition: background-image 0.5s ease-in-out; /* Transición suave */
+        }}
+        .stApp::before {{
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0.9));
+            z-index: -1;
+        }}
+        </style>
+        """, unsafe_allow_html=True)
+
 client_text, client_audio = init_api_keys()
 novel_text = cargar_novela()
 
@@ -179,75 +210,48 @@ elif st.session_state.page == "chat":
     key = st.session_state.current_char
     if not key or key not in CHARACTERS: st.session_state.page = "seleccion"; st.rerun()
     data = CHARACTERS[key]
-
-# --- FONDO INMERSIVO COMÚN (VESTÍBULO Y CHAT) ---
-# Se aplica si estamos en selección o chat
-if st.session_state.page in ["seleccion", "chat"]:
-    vestibulo_b64 = get_img_as_base64("img/vestibulo.png")
-    if vestibulo_b64:
-        st.markdown(f"""
-        <style>
-        .stApp {{
-            background-image: url("data:image/png;base64,{vestibulo_b64}");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-        }}
-        .stApp::before {{
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0.9));
-            z-index: -1;
-        }}
-        </style>
-        """, unsafe_allow_html=True)
     
-    if st.session_state.page == "chat":
-        if st.button("⬅️ Volver al Vestíbulo"): 
-            st.session_state.last_audio = None
-            st.session_state.page = "seleccion"
-            st.rerun()
+    # --- INTERFAZ DE CHAT ---
+    if st.button("⬅️ Volver al Vestíbulo"): 
+        st.session_state.last_audio = None
+        st.session_state.page = "seleccion"
+        st.rerun()
 
-        st.markdown(f"<h3>Conversando con {data['name']}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3>Conversando con {data['name']}</h3>", unsafe_allow_html=True)
+    
+    if key != "susana":
+        if st.button(f"📜 {data['short_name']}, comparte un recuerdo..."):
+            with st.spinner("Recordando..."):
+                texto_recuerdo = generar_recuerdo_personaje(client_text, data, novel_text)
+                msg_recuerdo = f"*(Cierra los ojos un instante)* {texto_recuerdo}"
+                st.session_state.messages.append({"role": "model", "content": msg_recuerdo})
+                with st.spinner("🔊 Generando voz..."):
+                    audio = generar_voz_gemini(client_audio, texto_recuerdo, key)
+                    st.session_state.last_audio = audio
+                st.rerun()
+
+    for m in st.session_state.messages:
+        with st.chat_message("assistant" if m["role"]=="model" else "user"):
+            st.markdown(m["content"])
+            if "[INSTAGRAM]" in m["content"]: st.link_button("📸 Instagram de Susana", LINK_INSTAGRAM)
+            
+    if st.session_state.last_audio: 
+        st.audio(st.session_state.last_audio, format="audio/wav", autoplay=True)
+
+    if prompt := st.chat_input("Escribe tu mensaje..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"): st.markdown(prompt)
         
-        if key != "susana":
-            if st.button(f"📜 {data['short_name']}, comparte un recuerdo..."):
-                with st.spinner("Recordando..."):
-                    texto_recuerdo = generar_recuerdo_personaje(client_text, data, novel_text)
-                    msg_recuerdo = f"*(Cierra los ojos un instante)* {texto_recuerdo}"
-                    st.session_state.messages.append({"role": "model", "content": msg_recuerdo})
-                    with st.spinner("🔊 Generando voz..."):
-                        audio = generar_voz_gemini(client_audio, texto_recuerdo, key)
-                        st.session_state.last_audio = audio
-                    st.rerun()
-
-        for m in st.session_state.messages:
-            with st.chat_message("assistant" if m["role"]=="model" else "user"):
-                st.markdown(m["content"])
-                if "[INSTAGRAM]" in m["content"]: st.link_button("📸 Instagram de Susana", LINK_INSTAGRAM)
-                
-        if st.session_state.last_audio: 
-            st.audio(st.session_state.last_audio, format="audio/wav", autoplay=True)
-
-        if prompt := st.chat_input("Escribe tu mensaje..."):
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"): st.markdown(prompt)
-            
-            texto_final = ""
-            with st.chat_message("assistant"):
-                stream = generar_respuesta_chat_stream(client_text, st.session_state.messages[:-1], prompt, data, novel_text)
-                texto_final = st.write_stream(stream)
-            
-            st.session_state.messages.append({"role": "model", "content": texto_final})
-            
-            if texto_final:
-                with st.spinner(f"🗣️ {data['short_name']} está hablando..."):
-                    audio_resp = generar_voz_gemini(client_audio, texto_final, key)
-                    st.session_state.last_audio = audio_resp
-            
-            st.rerun()
+        texto_final = ""
+        with st.chat_message("assistant"):
+            stream = generar_respuesta_chat_stream(client_text, st.session_state.messages[:-1], prompt, data, novel_text)
+            texto_final = st.write_stream(stream)
+        
+        st.session_state.messages.append({"role": "model", "content": texto_final})
+        
+        if texto_final:
+            with st.spinner(f"🗣️ {data['short_name']} está hablando..."):
+                audio_resp = generar_voz_gemini(client_audio, texto_final, key)
+                st.session_state.last_audio = audio_resp
+        
+        st.rerun()
