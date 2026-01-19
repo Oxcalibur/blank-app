@@ -6,8 +6,8 @@ import streamlit as st
 from config import SINOPSIS
 
 # --- CONFIGURACIÓN DE MODELOS ---
-PRIMARY_MODEL = "gemini-3-flash-preview"  # Intentamos usar este primero (Lo último)
-FALLBACK_MODEL = "gemini-2.5-flash"       # Si falla, usamos este (El estable)
+PRIMARY_MODEL = "gemini-2.5-flash"        # Principal: Optimizado para costes (Estable)
+FALLBACK_MODEL = "gemini-3-flash-preview" # Fallback: Opción futura o respaldo
 
 def _get_sys_instruction(personaje_data, contexto_libro):
     """Helper para no repetir código de instrucciones."""
@@ -22,8 +22,8 @@ def _get_sys_instruction(personaje_data, contexto_libro):
 # --- 1. VERSIÓN STREAMING (CON FALLBACK) ---
 def generar_respuesta_chat_stream(client, historial, prompt_usuario, personaje_data, contexto_libro):
     """
-    Intenta generar respuesta con Gemini 3.0. 
-    Si falla, cae automáticamente a Gemini 2.5.
+    Intenta generar respuesta con el modelo primario (PRIMARY_MODEL). 
+    Si falla, cae automáticamente al modelo de respaldo (FALLBACK_MODEL).
     Devuelve un generador seguro.
     """
     
@@ -58,14 +58,14 @@ def generar_respuesta_chat_stream(client, historial, prompt_usuario, personaje_d
                     first_chunk_read = True
                     yield chunk.text
             
-            # Si llegamos aquí sin errores, todo fue bien con Gemini 3.0
+            # Si llegamos aquí sin errores, todo fue bien con el modelo principal
             
         except Exception as e:
-            # Si falla, capturamos el error y cambiamos al modelo seguro
+            # Si falla, capturamos el error y cambiamos al modelo de respaldo
             print(f"⚠️ Fallo con {PRIMARY_MODEL}: {e}. Cambiando a {FALLBACK_MODEL}...")
             
             try:
-                # INTENTO 2: Modelo Fallback (Gemini 2.5)
+                # INTENTO 2: Modelo Fallback
                 active_model = FALLBACK_MODEL
                 stream_fallback = create_chat_stream(FALLBACK_MODEL)
                 for chunk in stream_fallback:
@@ -140,9 +140,9 @@ def generar_pregunta_trivial(client, contexto_libro):
     return {"pregunta": "¿En qué ciudad transcurre la trama?", "opciones": ["Madrid", "Sevilla", "Londres"], "correcta": "Sevilla"}
 
 def generar_curiosidad(client):
-    temas = ["moda victoriana", "medicina del siglo XIX", "etiqueta social", "inventos de la revolución industrial", "supersticiones", "literatura romántica", "vida en Londres vs Sevilla", "el lenguaje de los abanicos", "duelos de honor"]
+    temas = ["moda victoriana", "medicina del siglo XIX", "etiqueta social", "inventos de la revolución industrial", "supersticiones", "literatura romántica", "vida en Londres vs Sevilla", "el lenguaje de los abanicos", "duelos de honor","contexto historico"]
     tema = random.choice(temas)
-    prompt = f"Dato real curioso y poco conocido sobre {tema} durante el romanticismo (1870). Máximo 25 palabras. Varía la respuesta cada vez."
+    prompt = f"Dato real curioso y poco conocido sobre {tema} durante el periodo del romanticismo español o ingles. Máximo 25 palabras. Varía la respuesta cada vez."
     for model in [PRIMARY_MODEL, FALLBACK_MODEL]:
         try:
             res = client.models.generate_content(model=model, contents=prompt)
