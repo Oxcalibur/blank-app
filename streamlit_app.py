@@ -1,6 +1,10 @@
 import streamlit as st
 import time
+import importlib
+import config
 
+# Forzamos la recarga de config para que los cambios (como LINK_INSTAGRAM) se apliquen sin reiniciar
+importlib.reload(config)
 # Importamos módulos propios
 from config import CHARACTERS, SINOPSIS, CSS_STYLE, LINK_INSTAGRAM
 from utils import init_api_keys, cargar_novela, reproducir_musica_fondo, get_img_as_base64
@@ -242,7 +246,25 @@ elif st.session_state.page == "chat":
     for m in st.session_state.messages:
         with st.chat_message("assistant" if m["role"]=="model" else "user"):
             st.markdown(m["content"])
-            if "[INSTAGRAM]" in m["content"]: st.link_button("📸 Instagram de Susana", LINK_INSTAGRAM)
+            if "[INSTAGRAM]" in m["content"]:
+                # Usamos HTML directo para asegurar target="_blank" y que se abra la App/Nueva Pestaña
+                st.markdown(f"""
+                    <a href="{LINK_INSTAGRAM}" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
+                        <div style="
+                            display: inline-block;
+                            border: 1px solid #d4af37;
+                            color: #d4af37;
+                            padding: 0.5rem 1rem;
+                            border-radius: 5px;
+                            font-family: 'Playfair Display', serif;
+                            text-transform: uppercase;
+                            text-align: center;
+                            cursor: pointer;
+                            margin-top: 5px;">
+                            📸 Instagram de Susana
+                        </div>
+                    </a>
+                """, unsafe_allow_html=True)
             
     if st.session_state.last_audio: 
         st.audio(st.session_state.last_audio, format="audio/wav", autoplay=True)

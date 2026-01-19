@@ -4,7 +4,6 @@ import wave
 import re
 import streamlit as st
 from google.cloud import texttospeech
-from config import CHARACTERS
 
 # Función interna de generación (sin caché)
 def _sintetizar_audio(client, texto, voice_name, voice_style):
@@ -47,6 +46,7 @@ def _sintetizar_audio(client, texto, voice_name, voice_style):
 @st.cache_data(show_spinner=False, ttl=3600)
 def generar_audio_saludo_cached(_client, texto, personaje_key):
     """Genera audio y lo guarda en memoria para uso instantáneo futuro."""
+    from config import CHARACTERS
     # Nota: _client lleva guion bajo para que Streamlit no intente 'hashearlo'.
     datos = CHARACTERS.get(personaje_key)
     if not datos: return None
@@ -54,6 +54,7 @@ def generar_audio_saludo_cached(_client, texto, personaje_key):
 
 # Función para chat dinámico (siempre nuevo, sin caché)
 def generar_voz_gemini(client, texto, personaje_key):
+    from config import CHARACTERS
     datos = CHARACTERS.get(personaje_key)
     if not datos: return None
     return _sintetizar_audio(client, texto, datos['voice_name'], datos['voice_style'])

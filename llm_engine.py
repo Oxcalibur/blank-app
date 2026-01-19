@@ -3,7 +3,6 @@ from google.genai import errors
 import random
 import json
 import streamlit as st
-from config import SINOPSIS
 
 # --- CONFIGURACIÓN DE MODELOS ---
 PRIMARY_MODEL = "gemini-2.5-flash"        # Principal: Optimizado para costes (Estable)
@@ -11,6 +10,7 @@ FALLBACK_MODEL = "gemini-3-flash-preview" # Fallback: Opción futura o respaldo
 
 def _get_sys_instruction(personaje_data, contexto_libro):
     """Helper para no repetir código de instrucciones."""
+    from config import SINOPSIS
     return f"""
     {personaje_data['base_instruction']}
     DIRECTRIZ DE LONGITUD: Tus respuestas deben ser breves y conversacionales (máximo 50 palabras) para mantener un diálogo fluido con el lector.

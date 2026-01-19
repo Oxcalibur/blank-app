@@ -1,6 +1,6 @@
 # config.py
 
-LINK_INSTAGRAM = "https://www.instagram.com/susanaaguirrezabal?igsh=MXByMmVmNXdtMm5vcg=="
+LINK_INSTAGRAM = "https://www.instagram.com/susanaaguirrizabal?igsh=MXByMmVmNXdtMm5vcg=="
 
 SINOPSIS = """Inspirada en la inmortal obra de Charlotte Brontë, “Jane Eyre”. Pasión, misterio y una mujer que desafía el destino. Leonor Polo no es una mujer común. Sobreviviente de una infancia cruel y de un hospicio gris, se convierte en institutriz en la deslumbrante Villa Aurora en la Sevilla del siglo XIX. Allí, el carismático Maximiliano Alcázar despierta en ella una pasión prohibida, mientras la sombra de un secreto amenaza con destruirlo todo. Lejos, en el brumoso Londres victoriano, Leonor se reinventa como librera, forjando su independencia."""
 
