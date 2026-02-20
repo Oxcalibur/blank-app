@@ -6,7 +6,7 @@ import streamlit as st
 
 # --- CONFIGURACIÓN DE MODELOS ---
 PRIMARY_MODEL = "gemini-2.5-flash"        # Principal: Optimizado para costes (Estable)
-FALLBACK_MODEL = "gemini-3-flash-preview" # Fallback: Opción futura o respaldo
+FALLBACK_MODEL = "gemini-3-flash-preview" # fallback: Opción futura o respaldo
 
 def _get_sys_instruction(personaje_data, contexto_libro):
     """Helper para no repetir código de instrucciones."""
