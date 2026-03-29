@@ -1,12 +1,15 @@
 # utils.py
 import streamlit as st
 import os
+import datetime
+import zoneinfo
 import pypdf
 import base64
 from google.oauth2 import service_account
 from google import genai
 from google.genai import types
 from google.cloud import texttospeech
+from config import HORA_PICO_INICIO, HORA_PICO_FIN
 
 # --- OPTIMIZACIÓN: Usar cache de recursos para los clientes de API ---
 # Esto asegura que los clientes se creen UNA SOLA VEZ por aplicación, no por sesión/rerun.
@@ -28,24 +31,40 @@ def init_api_keys():
         st.error(f"Error de Autenticación: {e}")
         st.stop()
 
-# --- OPTIMIZACIÓN: Context Caching de Gemini ---
-# Esto asegura que el PDF se suba a Google y se cree un caché solo una vez.
-@st.cache_resource(show_spinner=False)
-def inicializar_cache_novela(_client, path="img/leonor.pdf"):
-    """Sube el PDF a Google y crea un caché de contexto para ahorrar tokens."""
+# --- GESTIÓN DE CACHÉ HÍBRIDA POR HORARIOS ---
+def es_hora_pico():
+    """Devuelve True si la hora actual de Madrid está entre HORA_PICO_INICIO y HORA_PICO_FIN."""
+    try:
+        tz = zoneinfo.ZoneInfo("Europe/Madrid")
+        ahora = datetime.datetime.now(tz)
+        return HORA_PICO_INICIO <= ahora.hour < HORA_PICO_FIN
+    except Exception as e:
+        print(f"Error al evaluar hora pico: {e}")
+        return False # Ante la duda o error, caemos en el modo valle (más barato)
+
+def obtener_o_crear_cache(client_text, path="img/leonor.pdf"):
+    """Crea o recupera la caché del documento solo si es hora pico."""
+    if not es_hora_pico():
+        return None
+
+    if "cache_name" in st.session_state and st.session_state.cache_name:
+        return st.session_state.cache_name
+
     try:
         if not os.path.exists(path):
             st.warning(f"No se encontró el archivo: {path}")
             return None
             
-        file_ref = _client.files.upload(file=path)
-        cache = _client.caches.create(
+        with st.spinner("Inicializando memoria fotográfica en Horas Pico..."):
+            file_ref = client_text.files.upload(file=path)
+            cache = client_text.caches.create(
             model="gemini-2.5-flash",
             config=types.CreateCachedContentConfig(
                 contents=[file_ref],
-                ttl="3600s" # 60 minutos de vida (se renueva con el uso)
+                    ttl="3600s" # 60 minutos de vida
             )
         )
+            st.session_state.cache_name = cache.name
         return cache.name
     except Exception as e:
         st.warning(f"No se pudo inicializar la caché de contexto: {e}")

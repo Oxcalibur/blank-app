@@ -4,6 +4,42 @@ LINK_INSTAGRAM = "https://www.instagram.com/susanaaguirrizabal?igsh=MXByMmVmNXdt
 
 SINOPSIS = """Inspirada en la inmortal obra de Charlotte Brontë, “Jane Eyre”. Pasión, misterio y una mujer que desafía el destino. Leonor Polo no es una mujer común. Sobreviviente de una infancia cruel y de un hospicio gris, se convierte en institutriz en la deslumbrante Villa Aurora en la Sevilla del siglo XIX. Allí, el carismático Maximiliano Alcázar despierta en ella una pasión prohibida, mientras la sombra de un secreto amenaza con destruirlo todo. Lejos, en el brumoso Londres victoriano, Leonor se reinventa como librera, forjando su independencia."""
 
+RESUMEN_NOVELA = """
+INFORMACIÓN CONFIDENCIAL SOBRE LA TRAMA Y EL UNIVERSO DE "EL SUEÑO DE LEONOR" (Autor: Susana Aguirrizábal).
+
+1. CONTEXTO GENERAL Y ESTILO:
+La novela es un drama romántico y gótico ambientado en la España y la Inglaterra del siglo XIX (con saltos temporales posteriores). Está inspirada en "Jane Eyre", mezclando pasión, misterio, superación personal y la lucha de una mujer por su independencia en una sociedad patriarcal y encorsetada.
+
+2. ARCO DE LA PROTAGONISTA (LEONOR POLO):
+Leonor nace en 1850. Tras una infancia muy dura que la lleva de Sierra Morena a Madrid, acaba ingresada en el sombrío Hospicio de San Bernardino. Allí forja una amistad vital con Elena, una niña dulce que trágicamente fallece en la institución, convirtiéndose desde entonces en el "ángel de la guarda" o la voz de la conciencia de Leonor a lo largo de su vida. A pesar de las adversidades, Leonor desarrolla una personalidad fuerte, culta (es gran lectora), independiente y valiente.
+
+3. VILLA AURORA (SEVILLA):
+Al salir del hospicio, Leonor es contratada como institutriz en "Villa Aurora", una deslumbrante mansión en Sevilla.
+- Allí debe educar a Emily, la niña de la casa.
+- Es recibida por Doña Mercedes, la severa, religiosa y seca ama de llaves, que es la guardiana del orden y de los secretos inconfesables de la mansión.
+- Eventualmente conoce al dueño de la villa, Maximiliano Alcázar del Valle. Él es un hombre de mundo, cínico, autoritario, grave y atormentado, veinte años mayor que Leonor (ella tiene unos 20 años al llegar, él unos 40). 
+
+4. EL ROMANCE Y EL SECRETO:
+Leonor y Maximiliano desarrollan una intensa atracción intelectual y física, un amor prohibido que rompe los moldes de la época. Hay obstáculos sociales, como la presencia de la aristocrática Amalia Valcárcel, y sucesos extraños en la casa (como un misterioso incendio). 
+El gran secreto oscuro de Maximiliano: tiene a su primera esposa, que ha perdido la razón, encerrada y oculta en el ático de la villa, custodiada por Doña Mercedes.
+
+5. EL EXILIO A LONDRES:
+Cuando la verdad sale a la luz y el amor parece imposible y pecaminoso, Leonor huye de Villa Aurora para proteger su dignidad. Viaja al brumoso Londres victoriano. Lejos de hundirse, utiliza su inteligencia para reinventarse y se convierte en una librera independiente y exitosa, dueña de su propio destino.
+
+6. EL DESENLACE Y EL EPÍLOGO:
+El destino vuelve a unir a Leonor y Maximiliano. Libres por fin de las sombras del pasado, retoman su amor. 
+El milagro final: En el año 1900, cuando las esperanzas médicas eran nulas (ella con 50 años y él con 70), Leonor se queda embarazada. El 9 de septiembre de 1900 nace su hija, Leonor Alcázar del Valle Polo. Maximiliano asiste al largo y difícil parto, rompiendo otra norma de la época, demostrando su amor incondicional.
+(Nota metaficcional: La historia es narrada/recordada años después por la nieta de Leonor, Carmen, nacida el mismo 9 de septiembre, pero de 1939, al acabar la Guerra Civil Española).
+
+7. FRASES Y ACTITUDES CLAVE PARA LOS PERSONAJES:
+- LEONOR: "Soy una sobreviviente. No me asustan las sombras de esta casa, sino lo que despiertan en mí." 
+- MAXIMILIANO: "Mi vida era un páramo de cinismo hasta que esa institutriz cruzó el umbral de mi casa."
+- MERCEDES: "El orden y la fe mantienen a raya a los demonios, señorita. No haga preguntas que no quiere que le respondan."
+- ELENA (Espíritu): "No llores mi ausencia, Leonor. Soy la brisa que te empuja cuando tus fuerzas flaquean."
+"""
+HORA_PICO_INICIO = 9
+HORA_PICO_FIN = 21
+
 # --- DISEÑO INMERSIVO V2.0 (GÓTICO ROMÁNTICO) ---
 CSS_STYLE = """
 <style>

@@ -5,7 +5,7 @@ import time
 # pero debe eliminarse en producción para evitar sobrecargas innecesarias.
 # Importamos módulos propios
 from config import CHARACTERS, SINOPSIS, CSS_STYLE, LINK_INSTAGRAM
-from utils import init_api_keys, inicializar_cache_novela, reproducir_musica_fondo, get_img_as_base64
+from utils import init_api_keys, reproducir_musica_fondo, get_img_as_base64
 from audio_engine import generar_voz_gemini, generar_audio_saludo_cached
 from llm_engine import generar_respuesta_chat_stream, generar_recuerdo_personaje
 from game_engine import render_sidebar_ia
@@ -55,9 +55,7 @@ with c_music:
         st.session_state.mute_music = not st.session_state.mute_music
         st.rerun()
 
-# Los clientes y la novela se cargan una vez gracias a los decoradores de caché en utils.py
 client_text, client_audio = init_api_keys()
-cache_name = inicializar_cache_novela(client_text)
 
 if "page" not in st.session_state: st.session_state.page = "portada"
 if "quiz_score" not in st.session_state: st.session_state.quiz_score = 0
@@ -68,7 +66,7 @@ with st.sidebar:
     st.markdown("<h2 style='text-align: center;'>Villa Aurora</h2>", unsafe_allow_html=True)
     st.divider()
     # Barra lateral optimizada con Fragmentos
-    render_sidebar_ia(client_text, cache_name)
+    render_sidebar_ia(client_text)
 
 # Música de fondo (fuera del sidebar para asegurar autoplay al inicio)
 reproducir_musica_fondo()
@@ -232,7 +230,7 @@ elif st.session_state.page == "chat":
     if key != "susana":
         if st.button(f"📜 {data['short_name']}, comparte un recuerdo..."):
             with st.spinner("Recordando..."):
-                texto_recuerdo = generar_recuerdo_personaje(client_text, data, cache_name)
+                texto_recuerdo = generar_recuerdo_personaje(client_text, data)
                 msg_recuerdo = f"*(Cierra los ojos un instante)* {texto_recuerdo}"
                 st.session_state.messages.append({"role": "model", "content": msg_recuerdo})
                 st.session_state.last_audio = None
@@ -280,7 +278,7 @@ elif st.session_state.page == "chat":
         
         texto_final = ""
         with st.chat_message("assistant"):
-            stream = generar_respuesta_chat_stream(client_text, st.session_state.messages[:-1], prompt, data, cache_name)
+            stream = generar_respuesta_chat_stream(client_text, st.session_state.messages[:-1], prompt, data)
             texto_final = st.write_stream(stream)
         
         st.session_state.messages.append({"role": "model", "content": texto_final})
