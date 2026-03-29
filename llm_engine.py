@@ -8,26 +8,25 @@ import streamlit as st
 PRIMARY_MODEL = "gemini-2.5-flash"        # Principal: Optimizado para costes (Estable)
 FALLBACK_MODEL = "gemini-3-flash-preview" # fallback: Opción futura o respaldo
 
-def _get_sys_instruction(personaje_data, contexto_libro):
+def _get_sys_instruction(personaje_data):
     """Helper para no repetir código de instrucciones."""
     from config import SINOPSIS
     return f"""
     {personaje_data['base_instruction']}
     DIRECTRIZ DE LONGITUD: Tus respuestas deben ser breves y conversacionales (máximo 50 palabras) para mantener un diálogo fluido con el lector.
     RESUMEN GENERAL: {SINOPSIS}
-    CONTENIDO ÍNTEGRO DE LA NOVELA:
-    {contexto_libro}
+    Basate estrictamente en el documento de la novela proporcionado como contexto.
     """
 
 # --- 1. VERSIÓN STREAMING (CON FALLBACK) ---
-def generar_respuesta_chat_stream(client, historial, prompt_usuario, personaje_data, contexto_libro):
+def generar_respuesta_chat_stream(client, historial, prompt_usuario, personaje_data, cache_name):
     """
     Intenta generar respuesta con el modelo primario (PRIMARY_MODEL). 
     Si falla, cae automáticamente al modelo de respaldo (FALLBACK_MODEL).
     Devuelve un generador seguro.
     """
     
-    sys_instruction = _get_sys_instruction(personaje_data, contexto_libro)
+    sys_instruction = _get_sys_instruction(personaje_data)
     
     hist_api = [
         types.Content(role=m["role"], parts=[types.Part.from_text(text=m["content"])]) 
@@ -36,9 +35,13 @@ def generar_respuesta_chat_stream(client, historial, prompt_usuario, personaje_d
 
     # Función interna que intenta conectar con un modelo específico
     def create_chat_stream(model_name):
+        config_kwargs = {"system_instruction": sys_instruction}
+        if cache_name:
+            config_kwargs["cached_content"] = cache_name
+            
         chat = client.chats.create(
             model=model_name, 
-            config=types.GenerateContentConfig(system_instruction=sys_instruction), 
+            config=types.GenerateContentConfig(**config_kwargs), 
             history=hist_api
         )
         return chat.send_message_stream(prompt_usuario)
@@ -77,20 +80,24 @@ def generar_respuesta_chat_stream(client, historial, prompt_usuario, personaje_d
     return stream_wrapper()
 
 # --- 2. VERSIÓN ESTÁTICA (CON FALLBACK) ---
-def generar_respuesta_chat(client, historial, prompt_usuario, personaje_data, contexto_libro):
-    sys_instruction = _get_sys_instruction(personaje_data, contexto_libro)
+def generar_respuesta_chat(client, historial, prompt_usuario, personaje_data, cache_name):
+    sys_instruction = _get_sys_instruction(personaje_data)
     
     hist_api = [
         types.Content(role=m["role"], parts=[types.Part.from_text(text=m["content"])]) 
         for m in historial
     ]
     
+    config_kwargs = {"system_instruction": sys_instruction}
+    if cache_name:
+        config_kwargs["cached_content"] = cache_name
+    
     # Lógica de reintento
     for model in [PRIMARY_MODEL, FALLBACK_MODEL]:
         try:
             chat = client.chats.create(
                 model=model, 
-                config=types.GenerateContentConfig(system_instruction=sys_instruction), 
+                config=types.GenerateContentConfig(**config_kwargs), 
                 history=hist_api
             )
             return chat.send_message(prompt_usuario).text
@@ -101,19 +108,27 @@ def generar_respuesta_chat(client, historial, prompt_usuario, personaje_data, co
     return "Lo siento, no puedo responder en este momento."
 
 # --- 3. RECUERDOS (CON FALLBACK) ---
-def generar_recuerdo_personaje(client, personaje_data, contexto_libro):
+def generar_recuerdo_personaje(client, personaje_data, cache_name):
+    from config import SINOPSIS
     prompt = f"""
     Actúa estrictamente como {personaje_data['name']}. 
-    Analiza tu evolución en el siguiente texto completo: 
-    {contexto_libro}
-    Selecciona un momento clave y emocional.
+    Analiza tu evolución en el texto de la novela adjunta en tu memoria. 
+    Selecciona un momento clave y emocional (invéntalo si es necesario manteniendo la coherencia).
     Nárralo en 1ª persona como si lo revivieras ahora.
     Máximo 100 palabras.
     """
     
+    config_kwargs = {}
+    if cache_name:
+        config_kwargs["cached_content"] = cache_name
+        
     for model in [PRIMARY_MODEL, FALLBACK_MODEL]:
         try:
-            res = client.models.generate_content(model=model, contents=prompt)
+            res = client.models.generate_content(
+                model=model, 
+                contents=prompt,
+                config=types.GenerateContentConfig(**config_kwargs) if config_kwargs else None
+            )
             return res.text.strip()
         except Exception as e:
             print(f"⚠️ Error recuerdo {model}: {e}")
@@ -122,16 +137,21 @@ def generar_recuerdo_personaje(client, personaje_data, contexto_libro):
     return "Intento recordar, pero hay mucha niebla..."
 
 # --- 4. CURIOSIDADES Y TRIVIAL (CON FALLBACK) ---
-def generar_pregunta_trivial(client, contexto_libro):
+def generar_pregunta_trivial(client, cache_name):
+    from config import SINOPSIS
     tema = random.choice(["detalles de la trama", "escenarios de la novela", "contexto histórico"])
-    prompt = f"Genera pregunta test difícil sobre {tema} basada en: {contexto_libro}. JSON Output: {{'pregunta':'','opciones':['','',''],'correcta':''}}"
+    prompt = f"Genera pregunta test difícil sobre {tema} basada en la novela de tu memoria. JSON Output: {{'pregunta':'','opciones':['','',''],'correcta':''}}"
     
+    config_kwargs = {"response_mime_type": "application/json"}
+    if cache_name:
+        config_kwargs["cached_content"] = cache_name
+        
     for model in [PRIMARY_MODEL, FALLBACK_MODEL]:
         try:
             res = client.models.generate_content(
                 model=model, 
                 contents=prompt, 
-                config=types.GenerateContentConfig(response_mime_type="application/json")
+                config=types.GenerateContentConfig(**config_kwargs)
             )
             return json.loads(res.text)
         except:

@@ -4,7 +4,7 @@ from llm_engine import generar_pregunta_trivial, generar_curiosidad
 
 # DECORADOR IMPORTANTE: Aísla el refresco de esta sección
 @st.fragment
-def render_sidebar_ia(client_text, novel_text):
+def render_sidebar_ia(client_text, cache_name):
     """Renderiza las pestañas de Juego y Curiosidades sin bloquear la app."""
     t_quiz, t_cur = st.tabs(["🎮 Juego", "💡 Curiosidades"])
     
@@ -15,7 +15,7 @@ def render_sidebar_ia(client_text, novel_text):
         # Botón para generar pregunta
         if st.button("🎲 Nueva Pregunta") or st.session_state.get("pregunta_actual") is None:
             with st.spinner("Consultando archivos..."):
-                q_json = generar_pregunta_trivial(client_text, novel_text)
+                q_json = generar_pregunta_trivial(client_text, cache_name)
                 st.session_state.pregunta_actual = q_json
                 st.rerun()
 
