@@ -104,6 +104,8 @@ if st.session_state.page == "portada":
             
     if st.session_state.last_audio: 
         st.audio(st.session_state.last_audio, format="audio/wav", autoplay=True)
+        # Limpiamos el audio para que no se reproduzca en el siguiente rerun
+        st.session_state.last_audio = None
 
 # --- SELECCIÓN ---
 elif st.session_state.page == "seleccion":
@@ -197,8 +199,6 @@ elif st.session_state.page == "seleccion":
                 st.session_state.current_char = "susana"
                 st.session_state.page = "chat"
                 st.session_state.messages = [{"role":"model", "content":CHARACTERS['susana']['greeting']}]
-                audio_saludo = generar_audio_saludo_cached(client_audio, CHARACTERS['susana']['greeting'], "susana")
-                st.session_state.last_audio = audio_saludo
                 st.rerun()
 
     st.divider()
@@ -212,8 +212,6 @@ elif st.session_state.page == "seleccion":
                     st.session_state.current_char = key
                     st.session_state.page = "chat"
                     st.session_state.messages = [{"role":"model", "content":CHARACTERS[key]['greeting']}]
-                    audio_saludo = generar_audio_saludo_cached(client_audio, CHARACTERS[key]['greeting'], key)
-                    st.session_state.last_audio = audio_saludo
                     st.rerun()
 
 # --- CHAT ---
@@ -237,14 +235,20 @@ elif st.session_state.page == "chat":
                 texto_recuerdo = generar_recuerdo_personaje(client_text, data, cache_name)
                 msg_recuerdo = f"*(Cierra los ojos un instante)* {texto_recuerdo}"
                 st.session_state.messages.append({"role": "model", "content": msg_recuerdo})
-                with st.spinner("🔊 Generando voz..."):
-                    audio = generar_voz_gemini(client_audio, texto_recuerdo, key)
-                    st.session_state.last_audio = audio
+                st.session_state.last_audio = None
                 st.rerun()
 
-    for m in st.session_state.messages:
+    for i, m in enumerate(st.session_state.messages):
         with st.chat_message("assistant" if m["role"]=="model" else "user"):
             st.markdown(m["content"])
+
+            if m["role"] == "model":
+                if st.button(f"🎧 Escucha su respuesta", key=f"play_audio_{i}"):
+                    with st.spinner("🔊 Generando voz..."):
+                        audio_data = generar_voz_gemini(client_audio, m["content"], key)
+                        st.session_state.last_audio = audio_data
+                        st.rerun()
+
             if "[INSTAGRAM]" in m["content"]:
                 # Usamos HTML directo para asegurar target="_blank" y que se abra la App/Nueva Pestaña
                 st.markdown(f"""
@@ -267,6 +271,8 @@ elif st.session_state.page == "chat":
             
     if st.session_state.last_audio: 
         st.audio(st.session_state.last_audio, format="audio/wav", autoplay=True)
+        # Limpiamos el audio para que no se reproduzca en el siguiente rerun
+        st.session_state.last_audio = None
 
     if prompt := st.chat_input("Escribe tu mensaje..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
@@ -279,9 +285,5 @@ elif st.session_state.page == "chat":
         
         st.session_state.messages.append({"role": "model", "content": texto_final})
         
-        if texto_final:
-            with st.spinner(f"🗣️ {data['short_name']} está hablando..."):
-                audio_resp = generar_voz_gemini(client_audio, texto_final, key)
-                st.session_state.last_audio = audio_resp
-        
+        st.session_state.last_audio = None
         st.rerun()

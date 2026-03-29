@@ -28,16 +28,26 @@ def generar_respuesta_chat_stream(client, historial, prompt_usuario, personaje_d
     
     sys_instruction = _get_sys_instruction(personaje_data)
     
-    hist_api = [
-        types.Content(role=m["role"], parts=[types.Part.from_text(text=m["content"])]) 
-        for m in historial
-    ]
+    hist_api = []
+    
+    # Solución al error de Cache: Inyectar la instrucción del sistema en el historial
+    if cache_name:
+        hist_api.append(types.Content(role="user", parts=[types.Part.from_text(text=f"[INSTRUCCIONES DE SISTEMA]\n{sys_instruction}\n¿Entendido?")]))
+        hist_api.append(types.Content(role="model", parts=[types.Part.from_text(text="Entendido. Asumiré este rol y seguiré las instrucciones estrictamente.")]))
+        # Para mantener el orden alterno (User/Model) que exige Gemini si el historial empieza con un saludo ("model")
+        if historial and historial[0]["role"] == "model":
+            hist_api.append(types.Content(role="user", parts=[types.Part.from_text(text="Perfecto, iniciamos la interacción.")]))
+            
+    for m in historial:
+        hist_api.append(types.Content(role=m["role"], parts=[types.Part.from_text(text=m["content"])]))
 
     # Función interna que intenta conectar con un modelo específico
     def create_chat_stream(model_name):
-        config_kwargs = {"system_instruction": sys_instruction}
+        config_kwargs = {}
         if cache_name:
             config_kwargs["cached_content"] = cache_name
+        else:
+            config_kwargs["system_instruction"] = sys_instruction
             
         chat = client.chats.create(
             model=model_name, 
@@ -83,14 +93,22 @@ def generar_respuesta_chat_stream(client, historial, prompt_usuario, personaje_d
 def generar_respuesta_chat(client, historial, prompt_usuario, personaje_data, cache_name):
     sys_instruction = _get_sys_instruction(personaje_data)
     
-    hist_api = [
-        types.Content(role=m["role"], parts=[types.Part.from_text(text=m["content"])]) 
-        for m in historial
-    ]
+    hist_api = []
     
-    config_kwargs = {"system_instruction": sys_instruction}
+    if cache_name:
+        hist_api.append(types.Content(role="user", parts=[types.Part.from_text(text=f"[INSTRUCCIONES DE SISTEMA]\n{sys_instruction}\n¿Entendido?")]))
+        hist_api.append(types.Content(role="model", parts=[types.Part.from_text(text="Entendido. Asumiré este rol y seguiré las instrucciones estrictamente.")]))
+        if historial and historial[0]["role"] == "model":
+            hist_api.append(types.Content(role="user", parts=[types.Part.from_text(text="Perfecto, iniciamos la interacción.")]))
+            
+    for m in historial:
+        hist_api.append(types.Content(role=m["role"], parts=[types.Part.from_text(text=m["content"])]))
+    
+    config_kwargs = {}
     if cache_name:
         config_kwargs["cached_content"] = cache_name
+    else:
+        config_kwargs["system_instruction"] = sys_instruction
     
     # Lógica de reintento
     for model in [PRIMARY_MODEL, FALLBACK_MODEL]:
