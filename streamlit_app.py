@@ -5,7 +5,7 @@ import time
 # pero debe eliminarse en producción para evitar sobrecargas innecesarias.
 # Importamos módulos propios
 from config import CHARACTERS, SINOPSIS, CSS_STYLE, LINK_INSTAGRAM
-from utils import init_api_keys, reproducir_musica_fondo, get_img_as_base64
+from utils import init_api_keys, reproducir_musica_fondo, get_img_as_base64, es_hora_pico
 from audio_engine import generar_voz_gemini, generar_audio_saludo_cached
 from llm_engine import generar_respuesta_chat_stream, generar_recuerdo_personaje
 from game_engine import render_sidebar_ia
@@ -64,6 +64,8 @@ if "last_audio" not in st.session_state: st.session_state.last_audio = None
 
 with st.sidebar:
     st.markdown("<h2 style='text-align: center;'>Villa Aurora</h2>", unsafe_allow_html=True)
+    if not es_hora_pico():
+        st.caption("🌙 *Leonor está más habladora y recuerda mejor los detalles de 9:00 a 21:00.*")
     st.divider()
     # Barra lateral optimizada con Fragmentos
     render_sidebar_ia(client_text)
